@@ -4,9 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
     
-    <!-- Smart Application Caching: Stale-While-Revalidate Pattern -->
-    <!-- This allows the browser to instantly load the app from cache, while silently syncing code updates in the background -->
-    <meta http-equiv="Cache-Control" content="max-age=0, stale-while-revalidate=86400, must-revalidate">
+    <!-- STRICT NO-CACHE SECURITY: Prevents stale HTML/JS data from persisting across sessions -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
 
     <title>OUNNA | Outdoor Tracking System</title>
     
@@ -351,7 +352,7 @@
             appId: "1:837098663012:web:cb61b9bd7f99ec4d6e8371"
         };
         const appId = 'onsale-crm-app';
-        const APP_VERSION = "1.0.1"; // CHANGE THIS NUMBER whenever you want to force an update prompt for users
+        const APP_VERSION = "1.0.2"; // CHANGE THIS NUMBER whenever you want to force an update prompt for users
 
         // --- Theme Hook ---
         const useTheme = () => {
@@ -490,19 +491,21 @@
             );
         };
 
-        // --- UPDATED: Cache-First Data Fetching Strategy ---
+        // --- UPDATED: Strict Data Fetching Strategy (No Local Stale Cache) ---
         const useCollection = (name) => {
             const { db, user } = useContext(FirebaseContext);
             const [data, setData] = useState([]);
             useEffect(() => {
-                if (!db || !user) return;
+                if (!db || !user) {
+                    setData([]); // SECURITY FIX: Instantly clear memory cache on logout
+                    return;
+                }
                 const { collection, onSnapshot } = window.firebaseSDK;
                 const collectionName = name === 'sales' ? 'orders' : name;
                 const ref = name === 'users' ? collection(db, 'artifacts', appId, 'users') : collection(db, 'artifacts', appId, 'public', 'data', collectionName);
                 
-                // includeMetadataChanges allows the app to render instantly from browser cache, 
-                // then silently updates the data state in the background when fresh data arrives from the server.
-                return onSnapshot(ref, { includeMetadataChanges: true }, (snap) => {
+                // SECURITY FIX: Removed includeMetadataChanges to guarantee real-time server data enforcement over offline cache
+                return onSnapshot(ref, (snap) => {
                     setData(snap.docs.map(d => ({ id: d.id, ...d.data() })));
                 });
             }, [db, user, name]);
@@ -515,7 +518,10 @@
             const [data, setData] = useState([]);
             
             useEffect(() => {
-                if (!db || !user) return;
+                if (!db || !user) {
+                    setData([]); // SECURITY FIX: Instantly clear memory cache on logout
+                    return;
+                }
                 const { collection, onSnapshot, query, where } = window.firebaseSDK;
                 const ref = collection(db, 'artifacts', appId, 'public', 'data', 'messages');
                 
@@ -527,7 +533,8 @@
                     q = query(ref, where('createdAt', '>=', dateLimit));
                 }
                 
-                return onSnapshot(q, { includeMetadataChanges: true }, (snap) => {
+                // SECURITY FIX: Removed includeMetadataChanges
+                return onSnapshot(q, (snap) => {
                     setData(snap.docs.map(d => ({ id: d.id, ...d.data() })));
                 });
             }, [db, user, daysBack]);
@@ -4325,7 +4332,7 @@
                                         </div>
                                         {isProfileMenuOpen && (
                                             <div className="absolute top-full right-0 mt-3 w-40 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl py-1 z-50 animate-in fade-in slide-in-from-top-2">
-                                                <button onClick={() => window.firebaseSDK.signOut(auth)} className="w-full text-left px-4 py-2.5 text-red-500 text-xs font-bold flex items-center gap-3 transition-colors hover:bg-red-50 dark:hover:bg-red-500/10">
+                                                <button onClick={() => window.firebaseSDK.signOut(auth).then(() => window.location.reload(true))} className="w-full text-left px-4 py-2.5 text-red-500 text-xs font-bold flex items-center gap-3 transition-colors hover:bg-red-50 dark:hover:bg-red-500/10">
                                                     <i className="fas fa-sign-out-alt"></i> Sign Out
                                                 </button>
                                             </div>
@@ -4344,7 +4351,7 @@
                                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">{greeting}, {profileName.split(' ')[0]}</p>
                             </div>
                             <div className="flex items-center gap-4">
-                                <button onClick={() => window.firebaseSDK.signOut(auth)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors">
+                                <button onClick={() => window.firebaseSDK.signOut(auth).then(() => window.location.reload(true))} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors">
                                     <i className="fas fa-sign-out-alt"></i> Sign Out
                                 </button>
                             </div>
@@ -4701,7 +4708,7 @@
                     <p className="text-slate-500 dark:text-slate-400 max-w-xs mx-auto text-sm font-medium leading-relaxed">
                         Your access to the <span className="font-bold text-slate-900 dark:text-white">OUNNA</span> tracking system has been deactivated by an administrator.
                     </p>
-                    <button onClick={() => window.firebaseSDK.signOut(auth)} className="mt-10 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-8 py-3 rounded-2xl font-bold text-xs tracking-widest transition-all active:scale-95 shadow-lg shadow-black/10">
+                    <button onClick={() => window.firebaseSDK.signOut(auth).then(() => window.location.reload(true))} className="mt-10 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-8 py-3 rounded-2xl font-bold text-xs tracking-widest transition-all active:scale-95 shadow-lg shadow-black/10">
                         RETURN TO LOGIN
                     </button>
                 </div>
