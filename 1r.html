@@ -1663,6 +1663,13 @@
                             </button>
                         )}
 
+                        {/* System Tab: Restricted to Admin only */}
+                        {currentProfileRole === 'Admin' && (
+                            <button onClick={() => { setSettingsTab('system'); if(isChatVisible) setIsChatVisible(false); }} className={`flex-1 min-w-[80px] py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${settingsTab === 'system' ? 'bg-brand-600 text-white shadow-lg' : 'text-slate-400'}`}>
+                                <i className="fas fa-server"></i> <span className="hidden sm:inline">System</span>
+                            </button>
+                        )}
+
                         {isChatVisible && (
                             <button onClick={() => { setSettingsTab('chat'); setActiveChatUser(null); }} className={`flex-1 min-w-[80px] py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 relative ${settingsTab === 'chat' ? 'bg-brand-600 text-white shadow-lg' : 'text-slate-400'}`}>
                                 <i className="fas fa-comments"></i> <span className="hidden sm:inline">Chat</span>
@@ -1795,6 +1802,60 @@
                                         <p className="text-[10px] mt-1 opacity-70">Add a custom sticker pack by clicking the + button.</p>
                                     </div>
                                 )}
+                            </div>
+                        </div>
+                    )}
+
+                    {settingsTab === 'system' && currentProfileRole === 'Admin' && (
+                        <div className="animate-in fade-in duration-200 space-y-4 min-w-0">
+                            <div className="flex justify-between items-center px-1">
+                                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">System & Diagnostics</h3>
+                            </div>
+                            
+                            {/* Clear Cache Action Card */}
+                            <div className="bg-white dark:bg-slate-800/40 p-4 sm:p-6 rounded-3xl border border-slate-200 dark:border-slate-700/50 shadow-sm flex flex-col gap-4 transition-all">
+                                <div className="flex items-start gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-500/10 text-amber-500 flex items-center justify-center text-xl flex-shrink-0 shadow-inner">
+                                        <i className="fas fa-broom"></i>
+                                    </div>
+                                    <div className="flex-1 min-w-0 pt-0.5">
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate">Clear Application Cache</h4>
+                                        <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                                            If the application is displaying outdated data, freezing, or experiencing synchronization issues, clearing the local browser cache and Service Workers will force a hard reset and fetch fresh data from the cloud.
+                                        </p>
+                                    </div>
+                                </div>
+                                <Button 
+                                    variant="primary" 
+                                    className="w-full !py-4 shadow-glow !bg-amber-500 hover:!bg-amber-600 !shadow-amber-500/30 text-white mt-2" 
+                                    onClick={() => {
+                                        addToast("Wiping local cache & refreshing...", "info");
+                                        setTimeout(() => {
+                                            if ('caches' in window) {
+                                                caches.keys().then(names => Promise.all(names.map(name => caches.delete(name))))
+                                                .finally(() => { window.location.reload(true); });
+                                            } else {
+                                                window.location.reload(true);
+                                            }
+                                        }, 1000);
+                                    }}
+                                >
+                                    <i className="fas fa-sync-alt mr-2"></i> CLEAR CACHE & RESTART APP
+                                </Button>
+                            </div>
+
+                            {/* App Info Card */}
+                            <div className="bg-white dark:bg-slate-800/40 p-4 sm:p-6 rounded-3xl border border-slate-200 dark:border-slate-700/50 shadow-sm flex items-center justify-between transition-all">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-brand-50 dark:bg-brand-500/10 text-brand-500 flex items-center justify-center shadow-inner">
+                                        <i className="fas fa-code-branch"></i>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-900 dark:text-white">OUNNA Tracking System</p>
+                                        <p className="text-[10px] text-slate-500 uppercase tracking-widest">Version {APP_VERSION}</p>
+                                    </div>
+                                </div>
+                                <span className="px-3 py-1 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold uppercase tracking-widest rounded-lg border border-emerald-200 dark:border-emerald-500/20">Up to date</span>
                             </div>
                         </div>
                     )}
@@ -4350,7 +4411,17 @@
                                             <i className="fas fa-chevron-down text-[8px] text-slate-500 pr-1.5"></i>
                                         </div>
                                         {isProfileMenuOpen && (
-                                            <div className="absolute top-full right-0 mt-3 w-40 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl py-1 z-50 animate-in fade-in slide-in-from-top-2">
+                                            <div className="absolute top-full right-0 mt-3 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl py-1 z-50 animate-in fade-in slide-in-from-top-2">
+                                                <button onClick={() => {
+                                                    if ('caches' in window) {
+                                                        caches.keys().then(names => Promise.all(names.map(name => caches.delete(name))))
+                                                        .finally(() => { window.location.reload(true); });
+                                                    } else {
+                                                        window.location.reload(true);
+                                                    }
+                                                }} className="w-full text-left px-4 py-2.5 text-amber-600 dark:text-amber-500 text-xs font-bold flex items-center gap-3 transition-colors hover:bg-amber-50 dark:hover:bg-amber-500/10 border-b border-slate-100 dark:border-slate-700/50">
+                                                    <i className="fas fa-broom"></i> Clear Cache
+                                                </button>
                                                 <button onClick={() => window.firebaseSDK.signOut(auth).then(() => window.location.reload(true))} className="w-full text-left px-4 py-2.5 text-red-500 text-xs font-bold flex items-center gap-3 transition-colors hover:bg-red-50 dark:hover:bg-red-500/10">
                                                     <i className="fas fa-sign-out-alt"></i> Sign Out
                                                 </button>
@@ -4369,9 +4440,19 @@
                                 </h2>
                                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">{greeting}, {profileName.split(' ')[0]}</p>
                             </div>
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2 lg:gap-4">
+                                <button onClick={() => {
+                                    if ('caches' in window) {
+                                        caches.keys().then(names => Promise.all(names.map(name => caches.delete(name))))
+                                        .finally(() => { window.location.reload(true); });
+                                    } else {
+                                        window.location.reload(true);
+                                    }
+                                }} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-amber-600 dark:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors" title="Clear Cache & Fetch Fresh Data">
+                                    <i className="fas fa-broom"></i> <span className="hidden md:inline">Clear Cache</span>
+                                </button>
                                 <button onClick={() => window.firebaseSDK.signOut(auth).then(() => window.location.reload(true))} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors">
-                                    <i className="fas fa-sign-out-alt"></i> Sign Out
+                                    <i className="fas fa-sign-out-alt"></i> <span className="hidden md:inline">Sign Out</span>
                                 </button>
                             </div>
                         </header>
