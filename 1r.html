@@ -62,9 +62,9 @@
     <!-- HTML5 QR/Barcode Scanner -->
     <script src="https://unpkg.com/html5-qrcode"></script>
 
-    <!-- NEW: Google Maps JavaScript API (v3.65) -->
-    <!-- REPLACE 'YOUR_GOOGLE_MAPS_API_KEY' with your actual key -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&v=3.65&libraries=geometry"></script>
+    <!-- NEW: Leaflet.js (OpenStreetMap) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
     <style>
         :root {
@@ -226,16 +226,17 @@
         #reader__header_message { display: none !important; }
         #reader a { display: none !important; }
 
-        /* NEW: Google Maps Custom Styles */
-        .gm-style-iw-c { padding: 0 !important; border-radius: 1rem !important; }
-        .gm-style-iw-d { overflow: hidden !important; }
-        .gm-style .gm-style-iw-tc::after { background: white !important; }
-        .dark .gm-style-iw-c { background-color: #0f172a !important; }
-        .dark .gm-style .gm-style-iw-tc::after { background: #0f172a !important; }
-        .dark .gm-style-iw-d { color: white !important; }
-        .gm-ui-hover-effect { display: none !important; } /* Hide default close button */
+        /* Leaflet Custom Styles */
+        .leaflet-container { font-family: 'Inter', sans-serif !important; border-radius: 1rem; z-index: 10;}
+        .leaflet-control-attribution { font-size: 8px !important; }
+        .dark .leaflet-layer,
+        .dark .leaflet-control-zoom-in,
+        .dark .leaflet-control-zoom-out,
+        .dark .leaflet-control-attribution {
+            filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+        }
 
-        /* NEW: Territory Map Custom Styles (Adapted for Google Maps Custom HTML Markers if needed later) */
+        /* NEW: Territory Map Custom Styles */
         .custom-marker {
             width: 36px; height: 36px;
             border-radius: 50% 50% 50% 0;
@@ -718,49 +719,34 @@
 
                 const initMap = setTimeout(() => {
                     if (mapInstance.current) {
-                        window.google.maps.event.trigger(mapInstance.current, 'resize');
+                        mapInstance.current.invalidateSize();
                         if (currentLat && currentLng) {
-                            mapInstance.current.setCenter({ lat: currentLat, lng: currentLng });
+                            mapInstance.current.setView([currentLat, currentLng]);
                         }
                         return;
                     }
                     
-                    if (window.google && window.google.maps) {
-                        const map = new window.google.maps.Map(mapRef.current, {
-                            center: { lat: currentLat || 11.5564, lng: currentLng || 104.9282 },
+                    if (window.L) {
+                        const map = window.L.map(mapRef.current, {
+                            center: [currentLat || 11.5564, currentLng || 104.9282],
                             zoom: 15,
-                            disableDefaultUI: true,
-                            zoomControl: true,
-                            mapId: 'DEMO_MAP_ID', // Optional: Use a map ID for advanced styling
-                            styles: document.documentElement.classList.contains('dark') ? [
-                                { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
-                                { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
-                                { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
-                                { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
-                                { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
-                                { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#263c3f" }] },
-                                { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#6b9a76" }] },
-                                { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] },
-                                { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#212a37" }] },
-                                { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
-                                { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#746855" }] },
-                                { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#1f2835" }] },
-                                { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#f3d19c" }] },
-                                { featureType: "transit", elementType: "geometry", stylers: [{ color: "#2f3948" }] },
-                                { featureType: "transit.station", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
-                                { featureType: "water", elementType: "geometry", stylers: [{ color: "#17263c" }] },
-                                { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#515c6d" }] },
-                                { featureType: "water", elementType: "labels.text.stroke", stylers: [{ color: "#17263c" }] }
-                            ] : []
+                            zoomControl: false 
                         });
+
+                        window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            maxZoom: 19,
+                            attribution: '© OpenStreetMap'
+                        }).addTo(map);
+
+                        window.L.control.zoom({ position: 'bottomright' }).addTo(map);
                         mapInstance.current = map;
                     }
 
                     setTimeout(() => {
                         if (mapInstance.current) {
-                            window.google.maps.event.trigger(mapInstance.current, 'resize');
+                            mapInstance.current.invalidateSize();
                             if (currentLat && currentLng) {
-                                mapInstance.current.panTo({ lat: currentLat, lng: currentLng });
+                                mapInstance.current.panTo([currentLat, currentLng]);
                             }
                         }
                     }, 250);
@@ -772,35 +758,28 @@
 
             useEffect(() => {
                 const map = mapInstance.current;
-                if (!map || !currentLat || !currentLng || !window.google) return;
+                if (!map || !currentLat || !currentLng || !window.L) return;
 
-                if (markerRef.current) markerRef.current.setMap(null);
-
-                // Use AdvancedMarkerElement if available, fallback to standard Marker
-                if (window.google.maps.marker?.AdvancedMarkerElement) {
-                     const pinElement = document.createElement("div");
-                     pinElement.className = `custom-marker ${previewData?.type === 'live' ? 'bg-red-500 pulse' : 'bg-brand-500'}`;
-                     pinElement.innerHTML = `<i class="fas ${previewData?.type === 'live' ? 'fa-satellite-dish' : 'fa-map-pin'} text-white text-[12px]"></i>`;
-
-                     markerRef.current = new window.google.maps.marker.AdvancedMarkerElement({
-                         map,
-                         position: { lat: currentLat, lng: currentLng },
-                         content: pinElement,
-                     });
-                } else {
-                     markerRef.current = new window.google.maps.Marker({
-                         position: { lat: currentLat, lng: currentLng },
-                         map: map,
-                         icon: {
-                             url: `data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" fill="${previewData?.type === 'live' ? '%23ef4444' : '%233b82f6'}"%3E%3Cpath d="M215.7 499.2C267 435 384 279.4 384 192C384 86 298 0 192 0S0 86 0 192c0 87.4 117 243 168.3 307.2c12.3 15.3 35.1 15.3 47.4 0zM192 128a64 64 0 1 1 0 128 64 64 0 1 1 0-128z"/%3E%3C/svg%3E`,
-                             scaledSize: new window.google.maps.Size(32, 42),
-                         }
-                     });
+                if (markerRef.current) {
+                    map.removeLayer(markerRef.current);
                 }
+
+                const iconHtml = `<div class="custom-marker ${previewData?.type === 'live' ? 'bg-red-500 pulse' : 'bg-brand-500'}">
+                    <i class="fas ${previewData?.type === 'live' ? 'fa-satellite-dish' : 'fa-map-pin'} text-white text-[12px]"></i>
+                </div>`;
+
+                const customIcon = window.L.divIcon({
+                    html: iconHtml,
+                    className: '',
+                    iconSize: [36, 36],
+                    iconAnchor: [18, 36]
+                });
+
+                markerRef.current = window.L.marker([currentLat, currentLng], { icon: customIcon }).addTo(map);
                 
                 setTimeout(() => {
                     if (mapInstance.current) {
-                        mapInstance.current.panTo({ lat: currentLat, lng: currentLng });
+                        mapInstance.current.panTo([currentLat, currentLng]);
                     }
                 }, 300);
                 
@@ -1071,6 +1050,13 @@
             const currentUserProfile = users.find(u => u.email?.toLowerCase() === auth.currentUser?.email?.toLowerCase());
             const currentProfileRole = currentUserProfile?.role || 'Staff';
 
+            // --- NEW: Security Role Filtering ---
+            const displayUsers = useMemo(() => {
+                if (currentProfileRole === 'Admin') return users;
+                // Hide Admins from Staff/Managers
+                return users.filter(u => u.role !== 'Admin');
+            }, [users, currentProfileRole]);
+
             const openForm = (u = null) => {
                 if (u && u.role === 'Admin' && currentProfileRole !== 'Admin') {
                     return addToast("Permission Denied: Only Admins can edit Admin accounts.", "error");
@@ -1093,8 +1079,9 @@
                 if (!editingId && !formData.password) return setFormError("Password is required for new users.");
                 if (!editingId && formData.password.length < 6) return setFormError("Password must be at least 6 characters.");
                 
+                // SECURITY FIX: Strict validation to prevent privilege escalation
                 if (formData.role === 'Admin' && currentProfileRole !== 'Admin') {
-                    return setFormError("Permission Denied: You do not have authorization to assign the Admin role.");
+                    return setFormError("Security Violation: Only existing Admins can create or assign Admin roles.");
                 }
                 
                 setLoading(true);
@@ -1237,12 +1224,6 @@
             const profileName = currentUserProfile?.name || auth.currentUser?.email?.split('@')[0] || 'User';
             const profilePhoto = currentUserProfile?.photo || '';
             const myId = auth.currentUser?.uid;
-
-            // Filter out Admin users so they are invisible to Managers and Staff
-            const visibleUsers = useMemo(() => {
-                if (currentProfileRole === 'Admin') return users;
-                return users.filter(u => u.role !== 'Admin');
-            }, [users, currentProfileRole]);
 
             const myMessages = useMemo(() => {
                 return messages.filter(m => m.senderId === myId || m.receiverId === myId);
@@ -1691,7 +1672,7 @@
                                 <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Accounts</h3>
                             </div>
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                {visibleUsers.map(u => (
+                                {displayUsers.map(u => (
                                     <div key={u.id} className="bg-white dark:bg-slate-800/40 p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-700/50 flex flex-col gap-2 sm:gap-3 shadow-sm transition-all hover:shadow-md active:scale-[0.98] min-w-0">
                                         <div className="flex items-center justify-between gap-2">
                                             <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -1736,6 +1717,43 @@
                                         </div>
                                     </div>
                                 ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {settingsTab === 'drivers' && (
+                        <div className="animate-in fade-in duration-200 space-y-3 min-w-0">
+                            <div className="flex justify-between items-center px-1">
+                                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Fleet Drivers</h3>
+                            </div>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                {drivers.map(d => (
+                                    <div key={d.id} className="bg-white dark:bg-slate-800/40 p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-700/50 flex flex-col gap-2 sm:gap-3 shadow-sm transition-all hover:shadow-md active:scale-[0.98] min-w-0">
+                                        <div className="flex items-center gap-3">
+                                            <Avatar name={d.name} url={d.photo} size="12" />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{d.name}</p>
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                    <p className="text-[10px] text-slate-500 truncate"><i className="fas fa-phone w-3"></i> {d.contact}</p>
+                                                    {d.plate && <span className="text-[10px] font-mono font-bold bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-300">{d.plate}</span>}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2 w-full mt-1">
+                                            <button onClick={() => openDriverForm(d)} className="flex-1 bg-slate-100 dark:bg-slate-700 hover:bg-brand-500 hover:text-white py-2 rounded-xl text-[10px] font-bold transition-colors">Edit</button>
+                                            <button onClick={() => handleDriverDelete(d.id)} className={`min-w-[60px] px-2 py-2 rounded-xl text-[10px] font-bold transition-all ${confirmDriverDeleteId === d.id ? 'bg-red-500 text-white' : 'bg-red-500/10 text-red-500 hover:bg-red-500/20'}`}>
+                                                {confirmDriverDeleteId === d.id ? 'Confirm' : 'Delete'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                                {drivers.length === 0 && (
+                                    <div className="col-span-full text-center py-10 text-slate-400">
+                                        <i className="fas fa-truck text-4xl mb-3 opacity-20"></i>
+                                        <p className="text-xs font-bold uppercase tracking-widest">No Drivers Found</p>
+                                        <p className="text-[10px] mt-1 opacity-70">Add a delivery driver by clicking the + button.</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -2541,472 +2559,330 @@
             );
         };
 
-        // --- NEW: Territory & Smart Routing View ---
-        const TerritoryMapView = () => {
-            const customers = useCollection('customers');
-            const users = useCollection('users');
-            const sales = useCollection('sales'); // NEW: Fetch sales for map debt tracking
-            const { auth } = useContext(FirebaseContext);
+        // --- NEW: Inventory View ---
+        const InventoryView = () => {
+            const products = useCollection('products');
+            const { db, auth } = useContext(FirebaseContext);
             const { addToast } = useContext(ToastContext);
+            const users = useCollection('users');
 
-            const currentUser = useMemo(() => users.find(u => u.email?.toLowerCase() === auth.currentUser?.email?.toLowerCase()), [users, auth.currentUser]);
+            const currentUser = useMemo(() => 
+                users.find(u => u.email?.toLowerCase() === auth.currentUser?.email?.toLowerCase()), 
+                [users, auth.currentUser]
+            );
             const currentRole = currentUser?.role || 'Staff';
-            const sellerId = currentUser?.sellerId || auth.currentUser?.email || '';
 
-            const accessibleCustomers = useMemo(() => {
-                const filtered = currentRole === 'Admin' ? customers : customers.filter(c => c.sellerId === sellerId);
-                return filtered.filter(c => c.lat && c.lng); // Only those with GPS
-            }, [customers, currentRole, sellerId]);
+            const [search, setSearch] = useState('');
+            const [selectedCategory, setSelectedCategory] = useState('All');
+            const [isModalOpen, setIsModalOpen] = useState(false);
+            const [formData, setFormData] = useState({ name: '', sku: '', price: '', qty: '', cost: '', category: 'General', photo: '' });
+            const [editingId, setEditingId] = useState(null);
+            const [loading, setLoading] = useState(false);
+            const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+            const [formError, setFormError] = useState('');
+            const [isScanning, setIsScanning] = useState(false);
 
-            const [mapTab, setMapTab] = useState('map'); // 'map' or 'planner'
-            const mapRef = useRef(null);
-            const mapInstance = useRef(null);
-            const markersRef = useRef([]);
+            // Cropper state
+            const [cropImage, setCropImage] = useState(null);
 
-            const [selectedCustomer, setSelectedCustomer] = useState(null);
-            const [routeQueue, setRouteQueue] = useState([]);
-            const [isOptimized, setIsOptimized] = useState(false);
-            const [optimizing, setOptimizing] = useState(false);
-            
-            const hasSetInitialBounds = useRef(false);
-            const infoWindowRef = useRef(null); // Reference for Google Maps InfoWindow
-
-            // 1. Initialize Google Map
-            useEffect(() => {
-                if (!mapRef.current) return;
-
-                if (!mapInstance.current && window.google && window.google.maps) {
-                    mapInstance.current = new window.google.maps.Map(mapRef.current, {
-                        center: { lat: 11.5564, lng: 104.9282 }, // Default PP
-                        zoom: 12,
-                        disableDefaultUI: true,
-                        zoomControl: true,
-                        mapId: 'DEMO_MAP_ID', // Optional: Use a map ID for advanced styling
-                        styles: document.documentElement.classList.contains('dark') ? [
-                            { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
-                            { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
-                            { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
-                            { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
-                            { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
-                            { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#263c3f" }] },
-                            { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#6b9a76" }] },
-                            { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] },
-                            { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#212a37" }] },
-                            { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
-                            { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#746855" }] },
-                            { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#1f2835" }] },
-                            { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#f3d19c" }] },
-                            { featureType: "transit", elementType: "geometry", stylers: [{ color: "#2f3948" }] },
-                            { featureType: "transit.station", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
-                            { featureType: "water", elementType: "geometry", stylers: [{ color: "#17263c" }] },
-                            { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#515c6d" }] },
-                            { featureType: "water", elementType: "labels.text.stroke", stylers: [{ color: "#17263c" }] }
-                        ] : []
-                    });
-                    
-                    infoWindowRef.current = new window.google.maps.InfoWindow({
-                        pixelOffset: new window.google.maps.Size(0, -30) // Offset for custom markers
-                    });
-                    
-                    // Close Infowindow when clicking on the map
-                    mapInstance.current.addListener('click', () => {
-                        infoWindowRef.current.close();
-                        setSelectedCustomer(null);
-                    });
-                }
-
-                const map = mapInstance.current;
-                if (!map || !window.google) return;
-
-                // Fix map rendering issues when switching tabs
-                if (mapTab === 'map') {
-                    setTimeout(() => {
-                        window.google.maps.event.trigger(map, 'resize');
-                    }, 100);
-                }
-
-                // Clear old markers
-                markersRef.current.forEach(m => m.setMap(null));
-                markersRef.current = [];
-
-                const bounds = new window.google.maps.LatLngBounds();
-                let hasValidMarkers = false;
-
-                accessibleCustomers.forEach(c => {
-                    const lat = parseFloat(c.lat);
-                    const lng = parseFloat(c.lng);
-                    if (isNaN(lat) || isNaN(lng)) return;
-
-                    const position = { lat, lng };
-                    bounds.extend(position);
-                    hasValidMarkers = true;
-
-                    const inRoute = routeQueue.some(r => r.id === c.id);
-                    const isSelected = selectedCustomer?.id === c.id;
-                    
-                    const debt = sales.filter(s => s.customerId === c.id).reduce((sum, s) => sum + (parseFloat(s.balanceDue) || 0), 0);
-                    const hasDebt = debt > 0;
-                    
-                    let bgColor = hasDebt ? 'bg-red-500' : 'bg-brand-500';
-                    let iconClass = hasDebt ? 'fa-file-invoice-dollar' : 'fa-store';
-                    
-                    if (isSelected) bgColor = 'bg-indigo-600 scale-110 z-50';
-                    if (inRoute) { bgColor = 'bg-emerald-500 pulse'; iconClass = 'fa-check'; }
-                    
-                    let marker;
-                    
-                    // Use AdvancedMarkerElement if available, fallback to standard Marker
-                    if (window.google.maps.marker?.AdvancedMarkerElement) {
-                        const pinElement = document.createElement("div");
-                        pinElement.className = `custom-marker ${bgColor}`;
-                        pinElement.innerHTML = `<i class="fas ${iconClass} text-white text-[12px]"></i>`;
-
-                        marker = new window.google.maps.marker.AdvancedMarkerElement({
-                            map,
-                            position: position,
-                            content: pinElement,
-                            title: c.shopName,
-                        });
-                        
-                        marker.addListener('click', () => {
-                            setSelectedCustomer(c);
-                            map.panTo(position);
-                        });
-                        
-                    } else {
-                         // Fallback for environments where AdvancedMarkerElement isn't supported/loaded
-                         marker = new window.google.maps.Marker({
-                             position: position,
-                             map: map,
-                             title: c.shopName,
-                             icon: {
-                                 url: `data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" fill="${hasDebt ? '%23ef4444' : (inRoute ? '%2310b981' : '%233b82f6')}"%3E%3Cpath d="M215.7 499.2C267 435 384 279.4 384 192C384 86 298 0 192 0S0 86 0 192c0 87.4 117 243 168.3 307.2c12.3 15.3 35.1 15.3 47.4 0zM192 128a64 64 0 1 1 0 128 64 64 0 1 1 0-128z"/%3E%3C/svg%3E`,
-                                 scaledSize: new window.google.maps.Size(32, 42),
-                             }
-                         });
-                         
-                         marker.addListener('click', () => {
-                             setSelectedCustomer(c);
-                             map.panTo(position);
-                         });
-                    }
-                    
-                    markersRef.current.push(marker);
-                });
-
-                // Only fit bounds initially
-                if (hasValidMarkers && !selectedCustomer && !hasSetInitialBounds.current) {
-                    map.fitBounds(bounds);
-                    // Add some padding after fitBounds
-                    const listener = window.google.maps.event.addListener(map, 'idle', () => {
-                        if (map.getZoom() > 14) map.setZoom(14);
-                        window.google.maps.event.removeListener(listener);
-                    });
-                    hasSetInitialBounds.current = true;
-                }
-
-            }, [mapTab, accessibleCustomers, routeQueue, selectedCustomer, sales]);
-
-            // 2. Haversine Distance Calculator (Using Google Maps Geometry Library)
-            const getDistance = (lat1, lon1, lat2, lon2) => {
-                if (window.google && window.google.maps && window.google.maps.geometry) {
-                     const p1 = new window.google.maps.LatLng(lat1, lon1);
-                     const p2 = new window.google.maps.LatLng(lat2, lon2);
-                     return window.google.maps.geometry.spherical.computeDistanceBetween(p1, p2) / 1000; // Returns km
-                }
+            const handleSave = async () => {
+                if (currentRole !== 'Admin') return addToast("Permission Denied: Admins only.", "error");
+                setFormError('');
+                if (!formData.name || !formData.sku) return setFormError("Name and SKU are required");
                 
-                // Fallback math if library fails to load
-                const R = 6371; // Earth Radius in km
-                const dLat = (lat2 - lat1) * Math.PI / 180;
-                const dLon = (lon2 - lon1) * Math.PI / 180;
-                const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                return R * c;
+                setLoading(true);
+                const { collection, addDoc, updateDoc, doc, serverTimestamp } = window.firebaseSDK;
+                try {
+                    const payload = { ...formData, updatedAt: serverTimestamp() };
+                    if (editingId) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', editingId), payload);
+                    else { payload.createdAt = serverTimestamp(); await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), payload); }
+                    setIsModalOpen(false); 
+                    setFormData({ name: '', sku: '', price: '', qty: '', cost: '', category: 'General', photo: '' }); 
+                    setEditingId(null);
+                    addToast(editingId ? "Product updated!" : "New product added!", "success");
+                } catch (e) { setFormError(e.message); }
+                setLoading(false);
             };
 
-            // 3. Nearest Neighbor Route Optimizer
-            const handleOptimizeRoute = () => {
-                if (routeQueue.length < 2) return addToast("Add at least 2 stops to optimize.", "error");
+            const openForm = (p = null) => {
+                if (currentRole !== 'Admin') return addToast("Permission Denied: Admins only.", "error");
+                setFormError('');
+                if(p) { setFormData({...p}); setEditingId(p.id); } 
+                else { setFormData({ name: '', sku: '', price: '', qty: '', cost: '', category: 'General', photo: '' }); setEditingId(null); }
+                setIsModalOpen(true);
+            };
 
-                setOptimizing(true);
-                addToast("Calculating optimal route...", "info");
+            const handleDelete = async (id) => {
+                if (currentRole !== 'Admin') return addToast("Permission Denied: Admins only.", "error");
+                if (confirmDeleteId === id) { 
+                    await window.firebaseSDK.deleteDoc(window.firebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', 'products', id)); 
+                    setConfirmDeleteId(null); 
+                    addToast("Product deleted.", "info");
+                } 
+                else { setConfirmDeleteId(id); setTimeout(() => setConfirmDeleteId(null), 3000); }
+            };
 
-                // Get Current GPS as Start Point
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(
-                        position => {
-                            const startLoc = { lat: position.coords.latitude, lng: position.coords.longitude };
-                            runAlgorithm(startLoc);
-                        },
-                        error => {
-                            // Fallback: Use the first customer in the queue as the start point if GPS fails
-                            addToast("GPS denied. Using first stop as origin.", "error");
-                            const startLoc = { lat: parseFloat(routeQueue[0].lat), lng: parseFloat(routeQueue[0].lng) };
-                            runAlgorithm(startLoc);
-                        }
-                    );
-                } else {
-                    const startLoc = { lat: parseFloat(routeQueue[0].lat), lng: parseFloat(routeQueue[0].lng) };
-                    runAlgorithm(startLoc);
+            const handleFileChange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = () => setCropImage(reader.result);
+                    reader.readAsDataURL(file);
                 }
-
-                function runAlgorithm(startLoc) {
-                    let unvisited = [...routeQueue];
-                    let currentLoc = startLoc;
-                    let sortedRoute = [];
-
-                    while(unvisited.length > 0) {
-                        let nearestIdx = 0;
-                        let minDistance = Infinity;
-
-                        for (let i = 0; i < unvisited.length; i++) {
-                            const dist = getDistance(currentLoc.lat, currentLoc.lng, parseFloat(unvisited[i].lat), parseFloat(unvisited[i].lng));
-                            if (dist < minDistance) {
-                                minDistance = dist;
-                                nearestIdx = i;
-                            }
-                        }
-
-                        const nearest = unvisited[nearestIdx];
-                        sortedRoute.push({...nearest, distanceFromLast: minDistance});
-                        currentLoc = { lat: parseFloat(nearest.lat), lng: parseFloat(nearest.lng) };
-                        unvisited.splice(nearestIdx, 1);
-                    }
-
-                    setTimeout(() => {
-                        setRouteQueue(sortedRoute);
-                        setIsOptimized(true);
-                        setOptimizing(false);
-                        addToast("Route fully optimized!", "success");
-                    }, 800); // Artificial delay for UX
-                }
+                e.target.value = '';
             };
 
-            const toggleRouteQueue = (customer) => {
-                const exists = routeQueue.find(c => c.id === customer.id);
-                if (exists) {
-                    setRouteQueue(routeQueue.filter(c => c.id !== customer.id));
-                    setIsOptimized(false);
-                    addToast("Removed from route", "info");
-                } else {
-                    setRouteQueue([...routeQueue, { ...customer, routeStatus: 'pending', reachedAt: null }]);
-                    setIsOptimized(false);
-                    addToast("Added to route", "success");
-                }
+            const handleScan = (scannedSku) => {
+                setIsScanning(false);
+                setSearch(scannedSku);
+                addToast("Barcode scanned successfully", "success");
             };
 
-            const markStopReached = (stopId) => {
-                setRouteQueue(prev => prev.map(stop =>
-                    stop.id === stopId
-                        ? { ...stop, routeStatus: 'reached', reachedAt: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }
-                        : stop
-                ));
-                addToast("Destination marked as reached!", "success");
-            };
+            const categories = ['All', 'General', 'Beverages', 'Snacks', 'Electronics', 'Apparel'];
 
-            const undoStopReached = (stopId) => {
-                setRouteQueue(prev => prev.map(stop =>
-                    stop.id === stopId
-                        ? { ...stop, routeStatus: 'pending', reachedAt: null }
-                        : stop
-                ));
-                addToast("Stop unlocked and marked as pending.", "info");
-            };
+            const filtered = useMemo(() => {
+                const s = search.toLowerCase();
+                return products.filter(p => {
+                    const matchSearch = (p.name || '').toLowerCase().includes(s) || 
+                                        (p.sku || '').toLowerCase().includes(s);
+                    const matchCat = selectedCategory === 'All' || p.category === selectedCategory;
+                    return matchSearch && matchCat;
+                });
+            }, [products, search, selectedCategory]);
+
+            const totalValue = products.reduce((sum, p) => sum + (parseFloat(p.cost || 0) * parseInt(p.qty || 0)), 0);
+            const lowStockCount = products.filter(p => parseInt(p.qty || 0) <= 5).length;
 
             return (
-                <div className="flex flex-col h-full space-y-4 animate-in fade-in duration-300">
-                    <div className="flex bg-slate-100 dark:bg-slate-800/60 p-1 rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-inner max-w-xl mx-auto w-full z-20 flex-shrink-0 overflow-x-auto hide-scrollbar">
-                        <button onClick={() => setMapTab('map')} className={`flex-1 min-w-[100px] py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${mapTab === 'map' ? 'bg-brand-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>
-                            <i className="fas fa-map-marked-alt"></i> Map
-                        </button>
-                        <button onClick={() => setMapTab('planner')} className={`flex-1 min-w-[120px] py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${mapTab === 'planner' ? 'bg-brand-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>
-                            <i className="fas fa-route"></i> Route {routeQueue.length > 0 && <span className={`px-1.5 py-0.5 rounded-md text-[9px] ml-1 ${mapTab === 'planner' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>{routeQueue.length}</span>}
-                        </button>
-                        <button onClick={() => setMapTab('report')} className={`flex-1 min-w-[120px] py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${mapTab === 'report' ? 'bg-brand-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>
-                            <i className="fas fa-clipboard-check"></i> Report
-                        </button>
-                    </div>
-
-                    {/* MAP VIEW - Always render, control via CSS hidden to preserve Leaflet state */}
-                    <div className={`relative flex-1 rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-700/50 shadow-sm min-h-[400px] ${mapTab === 'map' ? 'block' : 'hidden'}`}>
-                        <div ref={mapRef} className="absolute inset-0 w-full h-full z-10"></div>
-                        
-                        {/* Floating Map Customer Card */}
-                        {selectedCustomer && (() => {
-                            const selectedDebt = sales.filter(s => s.customerId === selectedCustomer.id).reduce((sum, s) => sum + (parseFloat(s.balanceDue) || 0), 0);
-                            return (
-                                <div className="absolute bottom-4 left-4 right-4 lg:left-1/2 lg:-translate-x-1/2 lg:w-96 z-[400] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl p-4 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 animate-in slide-in-from-bottom-4">
-                                    {selectedDebt > 0 && (
-                                        <div className="absolute -top-3 right-4 bg-red-500 text-white px-2.5 py-1 rounded-md text-[10px] font-black tracking-widest shadow-lg animate-pulse border border-red-400">
-                                            DEBT: ${selectedDebt.toFixed(2)}
-                                        </div>
-                                    )}
-                                    <button onClick={() => setSelectedCustomer(null)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-                                        <i className="fas fa-times text-xs"></i>
-                                    </button>
-                                    <div className="flex items-center gap-4 mb-4 pr-10">
-                                        <Avatar name={selectedCustomer.shopName} url={selectedCustomer.photo} size="12" isCircle={true} />
-                                        <div className="min-w-0">
-                                            <h3 className="font-bold text-slate-900 dark:text-white truncate">{selectedCustomer.shopName}</h3>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{selectedCustomer.ownerName} • {selectedCustomer.contact}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        {(() => {
-                                            const routeItem = routeQueue.find(r => r.id === selectedCustomer.id);
-                                            const isReached = routeItem?.routeStatus === 'reached';
-                                            
-                                            return (
-                                                <button 
-                                                    onClick={() => !isReached && toggleRouteQueue(selectedCustomer)} 
-                                                    className={`flex-1 py-3 rounded-xl text-xs font-bold transition-colors ${
-                                                        isReached ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 cursor-default' : 
-                                                        routeItem ? 'bg-red-50 dark:bg-red-500/10 text-red-600 border border-red-200 dark:border-red-500/20 hover:bg-red-100' : 
-                                                        'bg-brand-600 text-white shadow-lg shadow-brand-500/20 hover:bg-brand-500'
-                                                    }`}
-                                                >
-                                                    <i className={`fas ${isReached ? 'fa-check-double' : routeItem ? 'fa-minus-circle' : 'fa-plus-circle'} mr-1.5`}></i>
-                                                    {isReached ? 'Completed (Locked)' : routeItem ? 'Remove Stop' : 'Add to Route'}
-                                                </button>
-                                            );
-                                        })()}
-                                        <a href={`https://www.google.com/maps/dir/?api=1&destination=${selectedCustomer.lat},${selectedCustomer.lng}`} target="_blank" className="w-12 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-brand-500 hover:bg-slate-200 transition-colors">
-                                            <i className="fas fa-location-arrow"></i>
-                                        </a>
-                                    </div>
-                                </div>
-                            );
-                        })()}
-                    </div>
-
-                    {/* ROUTE PLANNER VIEW - Control via CSS hidden */}
-                    <div className={`flex-1 flex-col max-w-3xl mx-auto w-full ${mapTab === 'planner' ? 'flex' : 'hidden'}`}>
-                        <div className="bg-white dark:bg-slate-800/40 rounded-3xl border border-slate-200 dark:border-slate-700/50 shadow-sm p-5 mb-4 flex-shrink-0">
-                            <div className="flex justify-between items-center mb-4">
-                                    <div>
-                                        <h3 className="font-bold text-slate-900 dark:text-white">Active Route Stops</h3>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400">Total Destinations: {routeQueue.length}</p>
-                                    </div>
-                                    <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${isOptimized ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-amber-100 text-amber-600 dark:bg-amber-500/10 dark:text-amber-500'}`}>
-                                        {isOptimized ? 'Optimized' : 'Unoptimized'}
-                                    </span>
-                                </div>
-                                <Button className="w-full !py-4 shadow-glow" onClick={handleOptimizeRoute} disabled={optimizing || routeQueue.length < 2}>
-                                    {optimizing ? <i className="fas fa-circle-notch fa-spin"></i> : <><i className="fas fa-magic"></i> OPTIMIZE SHORTEST PATH</>}
-                                </Button>
+                <div className="space-y-6 lg:space-y-8 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-500 px-1">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 lg:gap-5">
+                        <div className="bg-white dark:bg-slate-800/60 p-4 lg:p-6 rounded-3xl border border-slate-200 dark:border-slate-700/50 shadow-sm flex items-center gap-4 transition-all hover:shadow-md">
+                            <div className="w-12 h-12 rounded-2xl bg-brand-50 dark:bg-brand-500/10 text-brand-500 flex items-center justify-center text-xl flex-shrink-0">
+                                <i className="fas fa-boxes"></i>
                             </div>
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest truncate">Total Items</p>
+                                <p className="text-xl lg:text-2xl font-black text-slate-900 dark:text-white truncate">{products.length}</p>
+                            </div>
+                        </div>
+                        <div className="bg-white dark:bg-slate-800/60 p-4 lg:p-6 rounded-3xl border border-slate-200 dark:border-slate-700/50 shadow-sm flex items-center gap-4 transition-all hover:shadow-md">
+                            <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 flex items-center justify-center text-xl flex-shrink-0">
+                                <i className="fas fa-dollar-sign"></i>
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest truncate">Est. Value</p>
+                                <p className="text-xl lg:text-2xl font-black text-slate-900 dark:text-white truncate">${totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                            </div>
+                        </div>
+                        <div className={`col-span-2 md:col-span-1 p-4 lg:p-6 rounded-3xl border shadow-sm flex items-center gap-4 transition-all hover:shadow-md ${lowStockCount > 0 ? 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30' : 'bg-white dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/50'}`}>
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl flex-shrink-0 ${lowStockCount > 0 ? 'bg-red-500 text-white animate-pulse' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'}`}>
+                                <i className="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <div className="min-w-0">
+                                <p className={`text-[10px] font-bold uppercase tracking-widest truncate ${lowStockCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-500'}`}>Low Stock Alerts</p>
+                                <p className={`text-xl lg:text-2xl font-black truncate ${lowStockCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white'}`}>{lowStockCount} Products</p>
+                            </div>
+                        </div>
+                    </div>
 
-                            <div className="flex-1 overflow-y-auto space-y-3 pb-safe custom-scroll pr-1">
-                                {routeQueue.length === 0 ? (
-                                    <div className="text-center py-16 text-slate-400">
-                                        <i className="fas fa-route text-5xl mb-4 opacity-20"></i>
-                                        <p className="text-xs font-bold uppercase tracking-widest">No Stops Planned</p>
-                                        <p className="text-[10px] mt-2 opacity-70">Go to the map to add customers to your daily route.</p>
-                                    </div>
-                                ) : (
-                                    routeQueue.map((stop, index) => (
-                                        <div key={stop.id} className={`bg-white dark:bg-slate-800/40 p-4 rounded-2xl border ${stop.routeStatus === 'reached' ? 'border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'border-slate-200 dark:border-slate-700/50'} shadow-sm flex items-center gap-4 transition-all hover:shadow-md animate-in slide-in-from-left-4`}>
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-black text-xs ${stop.routeStatus === 'reached' ? 'bg-emerald-500 text-white shadow-md' : (isOptimized ? 'bg-brand-500 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-700 text-slate-500')}`}>
-                                                {stop.routeStatus === 'reached' ? <i className="fas fa-check"></i> : (index + 1)}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <h4 className="font-bold text-slate-900 dark:text-white truncate">{stop.shopName}</h4>
-                                                <p className="text-[10px] text-slate-500 truncate">{stop.address || stop.ownerName || 'No specific address'}</p>
-                                                {isOptimized && stop.distanceFromLast && (
-                                                    <p className="text-[9px] font-bold text-emerald-500 mt-1"><i className="fas fa-car-side mr-1"></i>+{(stop.distanceFromLast).toFixed(1)} km</p>
-                                                )}
-                                                {stop.routeStatus === 'reached' && (
-                                                    <p className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 mt-1"><i className="far fa-clock mr-1"></i>Reached at {stop.reachedAt}</p>
-                                                )}
-                                            </div>
-                                            <div className="flex gap-2 flex-shrink-0">
-                                                {stop.routeStatus === 'reached' ? (
-                                                    <button onClick={() => undoStopReached(stop.id)} className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-500 flex items-center justify-center hover:bg-amber-500 hover:text-white transition-colors" title="Undo Reached Status">
-                                                        <i className="fas fa-undo"></i>
-                                                    </button>
-                                                ) : (
-                                                    <button onClick={() => markStopReached(stop.id)} className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center hover:bg-emerald-500 hover:text-white transition-colors" title="Mark as Reached">
-                                                        <i className="fas fa-check-double"></i>
-                                                    </button>
-                                                )}
-                                                <a href={`https://www.google.com/maps/dir/?api=1&destination=${stop.lat},${stop.lng}`} target="_blank" className="w-10 h-10 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-400 flex items-center justify-center hover:bg-brand-500 hover:text-white transition-colors">
-                                                    <i className="fas fa-location-arrow"></i>
-                                                </a>
-                                                {stop.routeStatus !== 'reached' && (
-                                                    <button onClick={() => toggleRouteQueue(stop)} className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors">
-                                                        <i className="fas fa-times"></i>
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))
+                    <div className="flex flex-col sm:flex-row gap-4 items-center">
+                        <div className="flex gap-2 w-full sm:flex-1 relative">
+                            <div className="relative flex-1">
+                                <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                <input className="input !pl-12 !py-3.5 lg:!py-4 shadow-sm !rounded-2xl" placeholder="Search by Name, SKU..." value={search} onChange={e => setSearch(e.target.value)} />
+                                {search && (
+                                    <button onClick={() => setSearch('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+                                        <i className="fas fa-times"></i>
+                                    </button>
                                 )}
                             </div>
+                            <button onClick={() => setIsScanning(true)} className="w-[52px] lg:w-[56px] flex-shrink-0 rounded-2xl bg-slate-900 dark:bg-brand-600 text-white flex items-center justify-center shadow-lg active:scale-95 transition-transform" title="Scan Barcode">
+                                <i className="fas fa-barcode text-xl"></i>
+                            </button>
                         </div>
-
-                    {/* TRACKING REPORT VIEW - Control via CSS hidden */}
-                    <div className={`flex-1 flex-col max-w-4xl mx-auto w-full animate-in fade-in ${mapTab === 'report' ? 'flex' : 'hidden'}`}>
-                        <div id="print-area" className="bg-white dark:bg-slate-800/40 rounded-3xl border border-slate-200 dark:border-slate-700/50 shadow-sm p-4 lg:p-6 print:shadow-none print:border-none print:w-full print:p-0 print:bg-white print:text-black">
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b border-slate-200 dark:border-slate-700/50 pb-4 gap-4">
-                                <div>
-                                    <h2 className="text-lg lg:text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter print:text-black">Daily Route Tracking</h2>
-                                    <p className="text-xs text-slate-500 mt-1 print:text-gray-600">Generated: {new Date().toLocaleDateString()}</p>
-                                </div>
-                                <div className="no-print w-full sm:w-auto">
-                                    <Button onClick={() => window.print()} className="shadow-sm !py-2 w-full sm:w-auto"><i className="fas fa-print"></i> Print Log</Button>
-                                </div>
-                            </div>
-
-                            {routeQueue.length === 0 ? (
-                                <div className="text-center py-12 text-slate-400">
-                                    <i className="fas fa-clipboard-list text-4xl mb-3 opacity-20"></i>
-                                    <p className="text-xs font-bold uppercase tracking-widest">No Data Available</p>
-                                    <p className="text-[10px] mt-2 opacity-70">Add stops and mark them as reached to generate a report.</p>
-                                </div>
-                            ) : (
-                                <div className="overflow-x-auto border border-slate-200 dark:border-slate-700/50 rounded-2xl print:border-0 print:overflow-visible">
-                                    <table className="w-full text-left text-xs lg:text-sm print:text-xs">
-                                        <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 print:bg-gray-100 print:text-gray-800">
-                                            <tr>
-                                                <th className="p-3 font-bold uppercase tracking-wider rounded-tl-xl print:rounded-none">#</th>
-                                                <th className="p-3 font-bold uppercase tracking-wider">Destination</th>
-                                                <th className="p-3 font-bold uppercase tracking-wider hidden sm:table-cell">Est. Dist</th>
-                                                <th className="p-3 font-bold uppercase tracking-wider">Status</th>
-                                                <th className="p-3 font-bold uppercase tracking-wider rounded-tr-xl print:rounded-none">Time</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50 print:divide-gray-200">
-                                            {routeQueue.map((stop, index) => (
-                                                <tr key={stop.id} className="text-slate-900 dark:text-white print:text-black">
-                                                    <td className="p-3 font-bold text-slate-400 print:text-gray-500">{index + 1}</td>
-                                                    <td className="p-3">
-                                                        <p className="font-bold">{stop.shopName}</p>
-                                                        <p className="text-[10px] text-slate-500 truncate max-w-[150px] lg:max-w-[250px] print:text-gray-600 print:max-w-none print:whitespace-normal">{stop.address || stop.ownerName}</p>
-                                                    </td>
-                                                    <td className="p-3 text-xs font-mono hidden sm:table-cell text-slate-500 print:text-gray-600">{stop.distanceFromLast ? `+${stop.distanceFromLast.toFixed(1)} km` : '-'}</td>
-                                                    <td className="p-3">
-                                                        <span className={`text-[9px] font-black px-2 py-1 rounded uppercase tracking-widest ${stop.routeStatus === 'reached' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 print:text-green-700 print:bg-transparent print:border print:border-green-700 print:px-1' : 'bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 print:text-orange-700 print:bg-transparent print:border print:border-orange-700 print:px-1'}`}>
-                                                            {stop.routeStatus === 'reached' ? 'Reached' : 'Pending'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-3 text-xs font-bold text-slate-500 print:text-gray-800">{stop.reachedAt || '--:--'}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                            
-                            <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700/50 flex justify-between text-[10px] text-slate-400 uppercase tracking-widest print:border-gray-200 print:text-gray-500">
-                                <span>Total Stops: {routeQueue.length}</span>
-                                <span>Reached: {routeQueue.filter(s => s.routeStatus === 'reached').length}</span>
-                            </div>
+                        <div className="flex overflow-x-auto hide-scrollbar gap-2 w-full sm:w-auto pb-1">
+                            {categories.map(cat => (
+                                <button 
+                                    key={cat}
+                                    onClick={() => setSelectedCategory(cat)} 
+                                    className={`px-5 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shadow-sm ${selectedCategory === cat ? 'bg-slate-900 dark:bg-brand-500 text-white' : 'bg-white dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                                >
+                                    {cat}
+                                </button>
+                            ))}
                         </div>
                     </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-6">
+                        {filtered.length === 0 ? (
+                            <div className="col-span-full text-center py-20 text-slate-400 bg-white/50 dark:bg-slate-800/30 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700/50 flex flex-col items-center justify-center">
+                                <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
+                                    <i className="fas fa-box-open text-4xl opacity-20"></i>
+                                </div>
+                                <p className="text-sm font-bold uppercase tracking-widest text-slate-500">No Products Found</p>
+                                <p className="text-xs mt-2 opacity-70 max-w-xs">Try adjusting your search or category filters to find what you're looking for.</p>
+                            </div>
+                        ) : (
+                            filtered.map(p => {
+                                const qty = parseInt(p.qty || 0);
+                                const isLowStock = qty <= 5;
+                                return (
+                                    <div key={p.id} className={`bg-white dark:bg-slate-800/80 p-5 rounded-3xl border ${isLowStock ? 'border-red-200 dark:border-red-500/30' : 'border-slate-200 dark:border-slate-700/50'} shadow-sm flex flex-col gap-4 transition-all hover:shadow-xl relative overflow-hidden group`}>
+                                        
+                                        {/* Status Ribbon for Low Stock */}
+                                        {isLowStock && (
+                                            <div className="absolute top-0 right-0 w-16 h-16 pointer-events-none overflow-hidden z-10">
+                                                <div className="absolute top-2 -right-6 bg-red-500 text-white text-[8px] font-black uppercase tracking-widest px-8 py-1 rotate-45 shadow-sm">Low Stock</div>
+                                            </div>
+                                        )}
+                                        
+                                        {/* Top: Image and Actions */}
+                                        <div className="flex gap-4 items-start relative z-0">
+                                            <div className="w-20 h-20 lg:w-24 lg:h-24 rounded-2xl bg-slate-100 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 flex items-center justify-center overflow-hidden flex-shrink-0 shadow-inner">
+                                                {p.photo ? <img src={p.photo} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" /> : <i className="fas fa-box text-slate-400 text-2xl"></i>}
+                                            </div>
+                                            <div className="flex-1 min-w-0 pt-1">
+                                                <div className="flex justify-between items-start gap-2 pr-6">
+                                                    <h3 className="font-bold text-slate-900 dark:text-white text-base leading-tight truncate" title={p.name}>{p.name}</h3>
+                                                </div>
+                                                <p className="text-xs font-mono font-bold text-brand-500 mt-1 truncate">#{p.sku}</p>
+                                                <span className="inline-block mt-2 px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-widest bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700">{p.category}</span>
+                                            </div>
+
+                                            {/* Action Menu (Admin Only) */}
+                                            {currentRole === 'Admin' && (
+                                                <div className="absolute top-0 right-0 flex flex-col gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0 duration-200">
+                                                    <button onClick={() => openForm(p)} className="w-8 h-8 rounded-full bg-white dark:bg-slate-700 shadow-md border border-slate-100 dark:border-slate-600 flex items-center justify-center text-slate-500 hover:text-brand-500 hover:bg-brand-50 transition-colors" title="Edit Product">
+                                                        <i className="fas fa-pen text-[10px]"></i>
+                                                    </button>
+                                                    <button onClick={() => handleDelete(p.id)} className={`w-8 h-8 rounded-full shadow-md border flex items-center justify-center transition-colors ${confirmDeleteId === p.id ? 'bg-red-500 text-white border-red-600' : 'bg-white dark:bg-slate-700 border-slate-100 dark:border-slate-600 text-slate-500 hover:text-red-500 hover:bg-red-50'}`} title="Delete Product">
+                                                        {confirmDeleteId === p.id ? <i className="fas fa-check text-[10px]"></i> : <i className="fas fa-trash text-[10px]"></i>}
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Bottom: Pricing & Stock Progress */}
+                                        <div className="grid grid-cols-2 gap-3 mt-auto pt-4 border-t border-slate-100 dark:border-slate-700/50">
+                                            <div className="bg-slate-50 dark:bg-slate-900/40 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/50">
+                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Sale Price</p>
+                                                <p className="text-base font-black text-slate-900 dark:text-white">${parseFloat(p.price || 0).toFixed(2)}</p>
+                                            </div>
+                                            <div className={`p-2.5 rounded-xl border ${isLowStock ? 'bg-red-50 dark:bg-red-500/5 border-red-100 dark:border-red-500/20' : 'bg-emerald-50 dark:bg-emerald-500/5 border-emerald-100 dark:border-emerald-500/20'}`}>
+                                                <p className={`text-[9px] font-bold uppercase tracking-widest mb-0.5 ${isLowStock ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}>Current Stock</p>
+                                                <p className={`text-base font-black ${isLowStock ? 'text-red-600 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-300'}`}>{qty} <span className="text-[10px] font-bold opacity-60 uppercase tracking-widest">Units</span></p>
+                                            </div>
+                                            
+                                            {/* Visual Stock Bar */}
+                                            <div className="col-span-2 px-1">
+                                                <div className="flex justify-between items-center mb-1.5">
+                                                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Capacity Status</span>
+                                                    <span className={`text-[8px] font-bold uppercase tracking-widest ${isLowStock ? 'text-red-500 animate-pulse' : 'text-emerald-500'}`}>{isLowStock ? 'Action Required' : 'Healthy'}</span>
+                                                </div>
+                                                <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex shadow-inner">
+                                                    <div className={`h-full rounded-full transition-all duration-1000 ${isLowStock ? 'bg-gradient-to-r from-red-500 to-red-400' : 'bg-gradient-to-r from-emerald-500 to-emerald-400'}`} style={{ width: `${Math.min(100, (qty / (isLowStock ? 10 : 50)) * 100)}%` }}></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+
+                    {currentRole === 'Admin' && (
+                        <button className="fab shadow-glow z-40" onClick={() => openForm()}>
+                            <i className="fas fa-plus"></i>
+                        </button>
+                    )}
+
+                    <FullScreenModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? "Edit Product" : "New Product"}>
+                        <div className="space-y-6 max-w-2xl mx-auto">
+                            {formError && <div className="bg-red-500/10 text-red-500 p-3 rounded-xl text-xs text-center font-bold border border-red-500/20 shadow-sm"><i className="fas fa-exclamation-triangle mr-2"></i>{formError}</div>}
+                            
+                            <div className="flex justify-center mb-4">
+                                <div className="relative">
+                                    <div className="w-28 h-28 lg:w-32 lg:h-32 rounded-3xl bg-slate-100 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 flex items-center justify-center overflow-hidden shadow-inner cursor-pointer group transition-all hover:border-brand-500" onClick={() => document.getElementById('p-up').click()}>
+                                        {formData.photo ? (
+                                            <img src={formData.photo} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                        ) : (
+                                            <div className="flex flex-col items-center text-slate-400 group-hover:text-brand-500 transition-colors">
+                                                <i className="fas fa-camera text-3xl mb-1"></i>
+                                                <span className="text-[9px] font-bold uppercase tracking-widest">Add Photo</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <button onClick={() => document.getElementById('p-up').click()} className="absolute -bottom-2 -right-2 w-10 h-10 bg-brand-500 text-white rounded-full flex items-center justify-center shadow-lg border-2 border-white dark:border-slate-900 transition-transform active:scale-95">
+                                        <i className="fas fa-image text-sm"></i>
+                                    </button>
+                                </div>
+                                <input id="p-up" type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-5">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-3">Product Name</label>
+                                        <input className="input !py-3.5" placeholder="e.g. Premium Widget" value={formData.name} onChange={e=>setFormData({...formData, name: e.target.value})} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-3">SKU / Barcode</label>
+                                        <div className="relative">
+                                            <input className="input !py-3.5 font-mono font-bold" placeholder="WIDG-001" value={formData.sku} onChange={e=>setFormData({...formData, sku: e.target.value})} />
+                                            <button type="button" onClick={() => setIsScanning(true)} className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-brand-500 hover:bg-brand-50 transition-colors flex items-center justify-center">
+                                                <i className="fas fa-barcode"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 lg:gap-5">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-3">Sale Price ($)</label>
+                                        <input type="number" className="input !py-3.5 font-bold" placeholder="0.00" value={formData.price} onChange={e=>setFormData({...formData, price: e.target.value})} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-3">Cost ($)</label>
+                                        <input type="number" className="input !py-3.5 font-bold" placeholder="0.00" value={formData.cost} onChange={e=>setFormData({...formData, cost: e.target.value})} />
+                                    </div>
+                                    <div className="space-y-1 col-span-2 md:col-span-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-3">Stock Qty</label>
+                                        <input type="number" className="input !py-3.5 font-bold" placeholder="0" value={formData.qty} onChange={e=>setFormData({...formData, qty: e.target.value})} />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-3">Category</label>
+                                    <select className="select !py-3.5 font-bold" value={formData.category} onChange={e=>setFormData({...formData, category: e.target.value})}>
+                                        {categories.filter(c => c !== 'All').map(c => (
+                                            <option key={c} value={c}>{c}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div className="pt-4 mt-6 border-t border-slate-100 dark:border-slate-700/50">
+                                <Button className="w-full !py-4 lg:!py-5 shadow-glow lg:text-base tracking-widest" onClick={handleSave} disabled={loading}>
+                                    {loading ? <i className="fas fa-circle-notch fa-spin"></i> : (editingId ? 'UPDATE PRODUCT' : 'ADD TO INVENTORY')}
+                                </Button>
+                            </div>
+                        </div>
+                    </FullScreenModal>
+
+                    {isScanning && <BarcodeScannerUI onScan={handleScan} onClose={() => setIsScanning(false)} />}
+                    
+                    <ImageCropperModal 
+                        isOpen={!!cropImage} 
+                        imageSrc={cropImage} 
+                        onCrop={(dataUrl) => {
+                            setFormData({...formData, photo: dataUrl});
+                            setCropImage(null);
+                        }} 
+                        onClose={() => setCropImage(null)} 
+                    />
                 </div>
             );
         };
-
         // --- Purchase/Sales View ---
         const PurchaseView = () => {
             const sales = useCollection('sales');
@@ -4000,14 +3876,10 @@
                     </div>
 
                     {/* Quick Actions / Mobile Home Menu */}
-                    <div className="grid grid-cols-3 md:grid-cols-5 gap-3 lg:gap-6">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 lg:gap-6">
                         <button onClick={() => setActiveTab('customers')} className="bg-white dark:bg-slate-800/60 p-4 lg:p-6 rounded-2xl lg:rounded-3xl flex flex-col items-center justify-center gap-2 lg:gap-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-slate-100 dark:border-slate-700/50 transition-all active:scale-95 hover:border-brand-500/30 hover:shadow-xl group">
                             <div className="w-10 h-10 lg:w-16 lg:h-16 rounded-xl lg:rounded-2xl bg-brand-50 dark:bg-brand-500/10 text-brand-500 flex items-center justify-center text-xl lg:text-3xl group-hover:scale-110 transition-transform"><i className="fas fa-users"></i></div>
                             <span className="text-[9px] lg:text-xs font-black uppercase tracking-widest text-slate-700 dark:text-slate-200">Clients</span>
-                        </button>
-                        <button onClick={() => setActiveTab('map')} className="bg-white dark:bg-slate-800/60 p-4 lg:p-6 rounded-2xl lg:rounded-3xl flex flex-col items-center justify-center gap-2 lg:gap-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-slate-100 dark:border-slate-700/50 transition-all active:scale-95 hover:border-purple-500/30 hover:shadow-xl group">
-                            <div className="w-10 h-10 lg:w-16 lg:h-16 rounded-xl lg:rounded-2xl bg-purple-50 dark:bg-purple-500/10 text-purple-500 flex items-center justify-center text-xl lg:text-3xl group-hover:scale-110 transition-transform"><i className="fas fa-map-marked-alt"></i></div>
-                            <span className="text-[9px] lg:text-xs font-black uppercase tracking-widest text-slate-700 dark:text-slate-200">Routing</span>
                         </button>
                         <button onClick={() => setActiveTab('inventory')} className="bg-white dark:bg-slate-800/60 p-4 lg:p-6 rounded-2xl lg:rounded-3xl flex flex-col items-center justify-center gap-2 lg:gap-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-slate-100 dark:border-slate-700/50 transition-all active:scale-95 hover:border-emerald-500/30 hover:shadow-xl group">
                             <div className="w-10 h-10 lg:w-16 lg:h-16 rounded-xl lg:rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 flex items-center justify-center text-xl lg:text-3xl group-hover:scale-110 transition-transform"><i className="fas fa-boxes"></i></div>
@@ -4388,7 +4260,6 @@
                             {[
                                 { id: 'dashboard', icon: 'fa-layer-group', label: 'Dashboard' },
                                 { id: 'customers', icon: 'fa-users', label: 'Clients & CRM' },
-                                { id: 'map', icon: 'fa-map-marked-alt', label: 'Territory & Routing' },
                                 { id: 'inventory', icon: 'fa-boxes', label: 'Inventory' },
                                 { id: 'purchase', icon: 'fa-shopping-cart', label: 'Sales Terminal' },
                                 { id: 'settings', icon: 'fa-cog', label: 'Admin Panel' }
@@ -4438,7 +4309,7 @@
                                     <div className="min-w-0">
                                         <h1 className="font-khmer-header text-sm sm:text-base text-slate-900 dark:text-white uppercase leading-tight truncate tracking-wider select-none">OUNNA</h1>
                                         <p className="text-[8px] font-bold text-brand-400 uppercase tracking-widest truncate">
-                                            {activeTab === 'dashboard' ? 'Launch Pad' : activeTab === 'customers' ? 'Tracking' : activeTab === 'map' ? 'Smart Routing' : activeTab === 'inventory' ? 'Inventory' : activeTab === 'purchase' ? 'Terminal' : 'Admin'}
+                                            {activeTab === 'dashboard' ? 'Launch Pad' : activeTab === 'customers' ? 'Tracking' : activeTab === 'inventory' ? 'Inventory' : activeTab === 'purchase' ? 'Terminal' : 'Admin'}
                                         </p>
                                     </div>
                                 </div>
@@ -4468,7 +4339,7 @@
                         <header className="hidden lg:flex items-center justify-between px-8 py-5 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/50 sticky top-0 z-30 flex-none">
                             <div>
                                 <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                                    {activeTab === 'dashboard' ? 'Launch Pad' : activeTab === 'customers' ? 'Clients & Tracking' : activeTab === 'map' ? 'Territory & Routing' : activeTab === 'inventory' ? 'Inventory Management' : activeTab === 'purchase' ? 'Sales Terminal' : 'Admin Settings'}
+                                    {activeTab === 'dashboard' ? 'Launch Pad' : activeTab === 'customers' ? 'Clients & Tracking' : activeTab === 'inventory' ? 'Inventory Management' : activeTab === 'purchase' ? 'Sales Terminal' : 'Admin Settings'}
                                 </h2>
                                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">{greeting}, {profileName.split(' ')[0]}</p>
                             </div>
@@ -4567,8 +4438,6 @@
                                         </div>
                                     )}
                                 </div>
-                            ) : activeTab === 'map' ? (
-                                <TerritoryMapView />
                             ) : activeTab === 'inventory' ? (
                                 <InventoryView />
                             ) : activeTab === 'purchase' ? (
@@ -4613,7 +4482,7 @@
                                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-3">Assign Seller</label>
                                         <select className="select" value={formData.sellerId} onChange={e=>setFormData({...formData, sellerId: e.target.value})}>
                                             <option value="">Select Seller</option>
-                                            {users.map(u => <option key={u.id} value={u.sellerId || u.email}>{u.name} (ID:{u.sellerId || 'N/A'})</option>)}
+                                            {users.filter(u => currentProfileRole === 'Admin' || u.role !== 'Admin').map(u => <option key={u.id} value={u.sellerId || u.email}>{u.name} (ID:{u.sellerId || 'N/A'})</option>)}
                                         </select>
                                     </div>
                                 </div>
