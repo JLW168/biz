@@ -2579,7 +2579,16 @@
             );
             const currentRole = currentUser?.role || 'Staff';
 
-            const [search, setSearch] = useState('');
+            const [search, setSearch] = useState(() => {
+                try {
+                    const saved = localStorage.getItem('inventorySearch');
+                    if (saved) {
+                        localStorage.removeItem('inventorySearch');
+                        return saved;
+                    }
+                } catch(e) {}
+                return '';
+            });
             const [selectedCategory, setSelectedCategory] = useState('All');
             const [isModalOpen, setIsModalOpen] = useState(false);
             const [formData, setFormData] = useState({ name: '', sku: '', price: '', qty: '', cost: '', category: 'General', photo: '' });
@@ -4062,17 +4071,27 @@
                                 <h3 className="text-[10px] font-bold text-red-500 uppercase tracking-widest flex items-center gap-1.5">
                                     <i className="fas fa-exclamation-triangle animate-pulse"></i> Low Stock Alerts
                                 </h3>
-                                <button onClick={() => setActiveTab('inventory')} className="text-[9px] font-bold text-slate-400 hover:text-brand-500 transition-colors">VIEW INVENTORY</button>
+                                <button onClick={() => { localStorage.removeItem('inventorySearch'); setActiveTab('inventory'); }} className="text-[9px] font-bold text-slate-400 hover:text-brand-500 transition-colors">VIEW INVENTORY</button>
                             </div>
                             <div className="bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 rounded-3xl p-4 flex gap-3 overflow-x-auto custom-scroll snap-x">
                                 {lowStockProducts.map(p => (
-                                    <div key={p.id} className="flex-none w-48 lg:w-56 bg-white dark:bg-slate-800 rounded-2xl p-3 shadow-sm border border-red-100 dark:border-red-500/30 flex items-center gap-3 snap-start cursor-pointer hover:shadow-md transition-all" onClick={() => setActiveTab('inventory')}>
+                                    <button 
+                                        type="button"
+                                        key={p.id} 
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            try { localStorage.setItem('inventorySearch', p.sku || p.name || ''); } catch(err) {}
+                                            setActiveTab('inventory');
+                                        }}
+                                        className="flex-none w-48 lg:w-56 bg-white dark:bg-slate-800 rounded-2xl p-3 shadow-sm border border-red-100 dark:border-red-500/30 flex items-center gap-3 snap-start cursor-pointer hover:shadow-md transition-all text-left outline-none focus:ring-2 focus:ring-red-500/50 active:scale-95"
+                                    >
                                         <Avatar name={p.name} url={p.photo} size="10" />
                                         <div className="min-w-0 flex-1">
                                             <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{p.name}</p>
                                             <p className="text-[10px] text-red-500 font-black mt-0.5">{p.qty || 0} Left in Stock</p>
                                         </div>
-                                    </div>
+                                    </button>
                                 ))}
                             </div>
                         </div>
