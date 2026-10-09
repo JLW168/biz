@@ -318,10 +318,10 @@
 
     <script type="module">
         import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, createUserWithEmailAndPassword, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, initializeFirestore, memoryLocalCache, collection, onSnapshot, doc, getDoc, addDoc, updateDoc, deleteDoc, query, where, serverTimestamp, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        window.firebaseSDK = { initializeApp, deleteApp, getAuth, getFirestore, initializeFirestore, memoryLocalCache, collection, onSnapshot, doc, getDoc, addDoc, updateDoc, deleteDoc, query, where, serverTimestamp, signInWithEmailAndPassword, onAuthStateChanged, signOut, setDoc, createUserWithEmailAndPassword, writeBatch };
+        window.firebaseSDK = { initializeApp, deleteApp, getAuth, getFirestore, initializeFirestore, memoryLocalCache, collection, onSnapshot, doc, getDoc, addDoc, updateDoc, deleteDoc, query, where, serverTimestamp, signInWithEmailAndPassword, onAuthStateChanged, signOut, setDoc, createUserWithEmailAndPassword, writeBatch, setPersistence, browserLocalPersistence };
     </script>
 
     <script type="text/babel">
@@ -424,9 +424,9 @@
                                 // Wipe the browser cache and force a hard reload
                                 if ('caches' in window) {
                                     caches.keys().then(names => Promise.all(names.map(name => caches.delete(name))))
-                                    .finally(() => { window.location.reload(true); });
+                                    .finally(() => { window.location.reload(); });
                                 } else {
-                                    window.location.reload(true);
+                                    window.location.reload();
                                 }
                             }}
                             className="bg-white text-brand-600 px-4 py-2.5 rounded-xl text-xs font-black tracking-widest shadow-lg active:scale-95 transition-transform uppercase"
@@ -447,7 +447,7 @@
             const [loading, setLoading] = useState(true);
 
             useEffect(() => {
-                const { initializeApp, initializeFirestore, memoryLocalCache, getAuth, onAuthStateChanged } = window.firebaseSDK;
+                const { initializeApp, initializeFirestore, memoryLocalCache, getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence } = window.firebaseSDK;
                 const app = initializeApp(firebaseConfig);
                 
                 // Use memoryLocalCache to prevent 'unavailable' errors in sandboxed environments
@@ -456,6 +456,10 @@
                 });
                 
                 const authInst = getAuth(app);
+                
+                // CRITICAL FIX: Force LocalStorage persistence so sessions survive cache clearing and reloads
+                setPersistence(authInst, browserLocalPersistence).catch(e => console.error("Auth persistence error:", e));
+
                 setDb(dbInst); setAuth(authInst);
                 return onAuthStateChanged(authInst, (u) => { setUser(u); setLoading(false); });
             }, []);
@@ -1832,9 +1836,9 @@
                                         setTimeout(() => {
                                             if ('caches' in window) {
                                                 caches.keys().then(names => Promise.all(names.map(name => caches.delete(name))))
-                                                .finally(() => { window.location.reload(true); });
+                                                .finally(() => { window.location.reload(); });
                                             } else {
-                                                window.location.reload(true);
+                                                window.location.reload();
                                             }
                                         }, 1000);
                                     }}
@@ -4414,14 +4418,14 @@
                                                 <button onClick={() => {
                                                     if ('caches' in window) {
                                                         caches.keys().then(names => Promise.all(names.map(name => caches.delete(name))))
-                                                        .finally(() => { window.location.reload(true); });
+                                                        .finally(() => { window.location.reload(); });
                                                     } else {
-                                                        window.location.reload(true);
+                                                        window.location.reload();
                                                     }
                                                 }} className="w-full text-left px-4 py-2.5 text-amber-600 dark:text-amber-500 text-xs font-bold flex items-center gap-3 transition-colors hover:bg-amber-50 dark:hover:bg-amber-500/10 border-b border-slate-100 dark:border-slate-700/50">
                                                     <i className="fas fa-broom"></i> Clear Cache
                                                 </button>
-                                                <button onClick={() => window.firebaseSDK.signOut(auth).then(() => window.location.reload(true))} className="w-full text-left px-4 py-2.5 text-red-500 text-xs font-bold flex items-center gap-3 transition-colors hover:bg-red-50 dark:hover:bg-red-500/10">
+                                                <button onClick={() => window.firebaseSDK.signOut(auth).then(() => window.location.reload())} className="w-full text-left px-4 py-2.5 text-red-500 text-xs font-bold flex items-center gap-3 transition-colors hover:bg-red-50 dark:hover:bg-red-500/10">
                                                     <i className="fas fa-sign-out-alt"></i> Sign Out
                                                 </button>
                                             </div>
@@ -4443,14 +4447,14 @@
                                 <button onClick={() => {
                                     if ('caches' in window) {
                                         caches.keys().then(names => Promise.all(names.map(name => caches.delete(name))))
-                                        .finally(() => { window.location.reload(true); });
+                                        .finally(() => { window.location.reload(); });
                                     } else {
-                                        window.location.reload(true);
+                                        window.location.reload();
                                     }
                                 }} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-amber-600 dark:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors" title="Clear Cache & Fetch Fresh Data">
                                     <i className="fas fa-broom"></i> <span className="hidden md:inline">Clear Cache</span>
                                 </button>
-                                <button onClick={() => window.firebaseSDK.signOut(auth).then(() => window.location.reload(true))} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors">
+                                <button onClick={() => window.firebaseSDK.signOut(auth).then(() => window.location.reload())} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors">
                                     <i className="fas fa-sign-out-alt"></i> <span className="hidden md:inline">Sign Out</span>
                                 </button>
                             </div>
@@ -4745,6 +4749,7 @@
             const { auth } = useContext(FirebaseContext);
             const [email, setEmail] = useState('');
             const [password, setPassword] = useState('');
+            const [showPassword, setShowPassword] = useState(false);
             const [loading, setLoading] = useState(false);
             const [error, setError] = useState('');
 
@@ -4781,7 +4786,23 @@
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-[10px] lg:text-xs font-black text-slate-400 uppercase ml-4 block tracking-widest">Secure Passcode</label>
-                                    <input type="password" class="input shadow-inner !bg-white/50 dark:!bg-slate-900/50 lg:!py-4" placeholder="••••••••" value={password} onChange={e=>setPassword(e.target.value)} required />
+                                    <div className="relative">
+                                        <input 
+                                            type={showPassword ? "text" : "password"} 
+                                            className="input shadow-inner !bg-white/50 dark:!bg-slate-900/50 lg:!py-4 pr-12" 
+                                            placeholder="••••••••" 
+                                            value={password} 
+                                            onChange={e=>setPassword(e.target.value)} 
+                                            required 
+                                        />
+                                        <button 
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-brand-500 transition-colors focus:outline-none"
+                                        >
+                                            <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'} text-lg`}></i>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             <Button type="submit" className="w-full shadow-lg !py-5 lg:!py-6 lg:text-base mt-2" disabled={loading}>{loading ? 'AUTHORIZING...' : 'SIGN IN'}</Button>
