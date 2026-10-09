@@ -1120,7 +1120,6 @@
                     }
                     
                     if (payload.role === 'Admin') payload.permissions = ['customers', 'orders', 'products', 'productCategories', 'productUnits', 'drivers'];
-                    else if (payload.role === 'Manager') payload.permissions = ['customers', 'orders', 'products', 'productCategories'];
                     else if (!payload.permissions || payload.permissions.length === 0) payload.permissions = ['customers', 'orders'];
 
                     await setDoc(doc(db, 'artifacts', appId, 'users', finalId), payload);
@@ -2634,7 +2633,6 @@
         // --- NEW: Inventory View ---
         const InventoryView = () => {
             const products = useCollection('products');
-            const rawCategories = useCollection('productCategories'); // NEW: Fetch custom categories
             const { db, auth } = useContext(FirebaseContext);
             const { addToast } = useContext(ToastContext);
             const users = useCollection('users');
@@ -2644,6 +2642,7 @@
                 [users, auth.currentUser]
             );
             const currentRole = currentUser?.role || 'Staff';
+            const canManageInventory = currentRole === 'Admin' || currentRole === 'Manager';
 
             const [search, setSearch] = useState(() => {
                 try {
@@ -2664,47 +2663,16 @@
             const [formError, setFormError] = useState('');
             const [isScanning, setIsScanning] = useState(false);
 
-            // --- NEW: Category Management State ---
-            const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
-            const [catFormData, setCatFormData] = useState({ name: '' });
-            const [editingCatId, setEditingCatId] = useState(null);
-            const [catLoading, setCatLoading] = useState(false);
-            const [confirmCatDeleteId, setConfirmCatDeleteId] = useState(null);
-
             // Cropper state
             const [cropImage, setCropImage] = useState(null);
 
-            // --- NEW: Category Handlers ---
-            const handleSaveCategory = async () => {
-                if (!catFormData.name.trim()) return addToast("Category name required", "error");
-                setCatLoading(true);
-                const { collection, addDoc, updateDoc, doc, serverTimestamp } = window.firebaseSDK;
-                try {
-                    const payload = { name: catFormData.name.trim(), updatedAt: serverTimestamp() };
-                    if (editingCatId) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'productCategories', editingCatId), payload);
-                    else { payload.createdAt = serverTimestamp(); await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'productCategories'), payload); }
-                    setCatFormData({ name: '' });
-                    setEditingCatId(null);
-                    addToast(editingCatId ? "Category updated!" : "Category added!", "success");
-                } catch(e) {
-                    addToast("Failed to save category", "error");
-                }
-                setCatLoading(false);
-            };
-
-            const handleDeleteCategory = async (id) => {
-                if (confirmCatDeleteId === id) {
-                    await window.firebaseSDK.deleteDoc(window.firebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', 'productCategories', id));
-                    setConfirmCatDeleteId(null);
-                    addToast("Category deleted.", "info");
-                } else {
-                    setConfirmCatDeleteId(id);
-                    setTimeout(() => setConfirmCatDeleteId(null), 3000);
-                }
-            };
+            const categories = useMemo(() => {
+                const catSet = new Set(products.map(p => p.category).filter(Boolean));
+                return ['All', ...Array.from(catSet)];
+            }, [products]);
 
             const handleSave = async () => {
-                if (currentRole !== 'Admin' && currentRole !== 'Manager') return addToast("Permission Denied: Admins and Managers only.", "error");
+                if (!canManageInventory) return addToast("Permission Denied: Admins and Managers only.", "error");
                 setFormError('');
                 if (!formData.name || !formData.sku) return setFormError("Name and SKU are required");
                 
@@ -2715,8 +2683,7 @@
                     if (editingId) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', editingId), payload);
                     else { payload.createdAt = serverTimestamp(); await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), payload); }
                     setIsModalOpen(false); 
-                    const defaultCat = rawCategories.length > 0 ? rawCategories[0].name : '';
-                    setFormData({ name: '', sku: '', price: '', qty: '', cost: '', category: defaultCat, photo: '' }); 
+                    setFormData({ name: '', sku: '', price: '', qty: '', cost: '', category: 'General', photo: '' }); 
                     setEditingId(null);
                     addToast(editingId ? "Product updated!" : "New product added!", "success");
                 } catch (e) { setFormError(e.message); }
@@ -2724,19 +2691,15 @@
             };
 
             const openForm = (p = null) => {
-                if (currentRole !== 'Admin' && currentRole !== 'Manager') return addToast("Permission Denied: Admins and Managers only.", "error");
+                if (!canManageInventory) return addToast("Permission Denied: Admins and Managers only.", "error");
                 setFormError('');
                 if(p) { setFormData({...p}); setEditingId(p.id); } 
-                else { 
-                    const defaultCat = rawCategories.length > 0 ? rawCategories[0].name : '';
-                    setFormData({ name: '', sku: '', price: '', qty: '', cost: '', category: defaultCat, photo: '' }); 
-                    setEditingId(null); 
-                }
+                else { setFormData({ name: '', sku: '', price: '', qty: '', cost: '', category: '', photo: '' }); setEditingId(null); }
                 setIsModalOpen(true);
             };
 
             const handleDelete = async (id) => {
-                if (currentRole !== 'Admin' && currentRole !== 'Manager') return addToast("Permission Denied: Admins and Managers only.", "error");
+                if (!canManageInventory) return addToast("Permission Denied: Admins and Managers only.", "error");
                 if (confirmDeleteId === id) { 
                     await window.firebaseSDK.deleteDoc(window.firebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', 'products', id)); 
                     setConfirmDeleteId(null); 
@@ -2760,12 +2723,6 @@
                 setSearch(scannedSku);
                 addToast("Barcode scanned successfully", "success");
             };
-
-            const categories = useMemo(() => {
-                const customCats = rawCategories.map(c => c.name);
-                const combined = Array.from(new Set([...customCats])).sort();
-                return ['All', ...combined];
-            }, [rawCategories]);
 
             const filtered = useMemo(() => {
                 const s = search.toLowerCase();
@@ -2837,14 +2794,6 @@
                                     {cat}
                                 </button>
                             ))}
-                            {(currentRole === 'Admin' || currentRole === 'Manager') && (
-                                <button 
-                                    onClick={() => setIsCategoryManagerOpen(true)}
-                                    className="px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shadow-sm bg-slate-100 dark:bg-slate-800 text-brand-500 border border-slate-200 dark:border-slate-700/50 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center gap-2 flex-shrink-0"
-                                >
-                                    <i className="fas fa-cog"></i> Categories
-                                </button>
-                            )}
                         </div>
                     </div>
 
@@ -2884,8 +2833,8 @@
                                                 <span className="inline-block mt-2 px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-widest bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700">{p.category}</span>
                                             </div>
 
-                                            {/* Action Menu (Admin & Manager) */}
-                                            {(currentRole === 'Admin' || currentRole === 'Manager') && (
+                                            {/* Action Menu (Admin/Manager Only) */}
+                                            {canManageInventory && (
                                                 <div className="absolute top-0 right-0 flex flex-col gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0 duration-200">
                                                     <button onClick={() => openForm(p)} className="w-8 h-8 rounded-full bg-white dark:bg-slate-700 shadow-md border border-slate-100 dark:border-slate-600 flex items-center justify-center text-slate-500 hover:text-brand-500 hover:bg-brand-50 transition-colors" title="Edit Product">
                                                         <i className="fas fa-pen text-[10px]"></i>
@@ -2925,7 +2874,7 @@
                         )}
                     </div>
 
-                    {(currentRole === 'Admin' || currentRole === 'Manager') && (
+                    {canManageInventory && (
                         <button className="fab shadow-glow z-40" onClick={() => openForm()}>
                             <i className="fas fa-plus"></i>
                         </button>
@@ -2988,11 +2937,18 @@
 
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-3">Category</label>
-                                    <select className="select !py-3.5 font-bold" value={formData.category} onChange={e=>setFormData({...formData, category: e.target.value})}>
+                                    <input 
+                                        className="input !py-3.5 font-bold" 
+                                        list="category-options" 
+                                        placeholder="e.g. Retail" 
+                                        value={formData.category} 
+                                        onChange={e=>setFormData({...formData, category: e.target.value})} 
+                                    />
+                                    <datalist id="category-options">
                                         {categories.filter(c => c !== 'All').map(c => (
-                                            <option key={c} value={c}>{c}</option>
+                                            <option key={c} value={c} />
                                         ))}
-                                    </select>
+                                    </datalist>
                                 </div>
                             </div>
                             
@@ -3004,63 +2960,851 @@
                         </div>
                     </FullScreenModal>
 
-                    {/* NEW: Category Management Modal */}
-                    <FullScreenModal isOpen={isCategoryManagerOpen} onClose={() => setIsCategoryManagerOpen(false)} title="Manage Categories">
-                        <div className="space-y-6 max-w-2xl mx-auto">
-                            {/* Form */}
-                            <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-3xl border border-slate-200 dark:border-slate-700/50 flex flex-col sm:flex-row gap-3 items-end">
-                                <div className="flex-1 w-full space-y-1">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">New Category Name</label>
-                                    <input className="input !py-3" placeholder="e.g. Mechanical Parts" value={catFormData.name} onChange={e=>setCatFormData({name: e.target.value})} />
+                    {isScanning && <BarcodeScannerUI onScan={handleScan} onClose={() => setIsScanning(false)} />}
+                    
+                    <ImageCropperModal 
+                        isOpen={!!cropImage} 
+                        imageSrc={cropImage} 
+                        onCrop={(dataUrl) => {
+                            setFormData({...formData, photo: dataUrl});
+                            setCropImage(null);
+                        }} 
+                        onClose={() => setCropImage(null)} 
+                    />
+                </div>
+            );
+        };
+        // --- Purchase/Sales View ---
+        const PurchaseView = () => {
+            const sales = useCollection('sales');
+            const customers = useCollection('customers');
+            const products = useCollection('products');
+            const drivers = useCollection('drivers');
+            const users = useCollection('users');
+            const { db, auth } = useContext(FirebaseContext);
+            const { addToast } = useContext(ToastContext);
+            
+            // Tab & Report State
+            const [saleTab, setSaleTab] = useState('recent');
+            const [reportFilter, setReportFilter] = useState('Today');
+            const [customStartDate, setCustomStartDate] = useState('');
+            const [customEndDate, setCustomEndDate] = useState('');
+            const [reportSellerId, setReportSellerId] = useState('All');
+            const [reportPaymentMethod, setReportPaymentMethod] = useState('All');
+            const [reportCustomerSearch, setReportCustomerSearch] = useState('');
+
+            const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
+            const [isScanning, setIsScanning] = useState(false);
+            const [loading, setLoading] = useState(false);
+            const [formError, setFormError] = useState('');
+            
+            // New Sale State
+            const [invoiceNo, setInvoiceNo] = useState('');
+            const [saleDate, setSaleDate] = useState('');
+            const [selectedCustomer, setSelectedCustomer] = useState(null);
+            const [selectedDriverId, setSelectedDriverId] = useState('');
+            const [paymentMethod, setPaymentMethod] = useState('Cash');
+            const [discountType, setDiscountType] = useState('Cash');
+            const [discountValue, setDiscountValue] = useState(0);
+            const [paymentStatusToggle, setPaymentStatusToggle] = useState('Paid'); // NEW: Paid, Partial, Unpaid
+            const [amountPaid, setAmountPaid] = useState(''); // NEW: Track partial payments
+            const [cart, setCart] = useState([]);
+            const [editingSaleId, setEditingSaleId] = useState(null);
+            const [confirmSaleDeleteId, setConfirmSaleDeleteId] = useState(null);
+            
+            // Search States
+            const [custSearch, setCustSearch] = useState('');
+            const [prodSearch, setProdSearch] = useState('');
+
+            // --- NEW: Haversine Distance Calculator (in meters) ---
+            const getDistanceInMeters = (lat1, lon1, lat2, lon2) => {
+                const R = 6371e3; // Earth radius in meters
+                const dLat = (lat2 - lat1) * Math.PI / 180;
+                const dLon = (lon2 - lon1) * Math.PI / 180;
+                const a = Math.sin(dLat/2) * Math.sin(dLat/2) + 
+                          Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                return R * c; 
+            };
+
+            // Robust sellerId extraction logic
+            const currentUser = useMemo(() => 
+                users.find(u => u.email?.toLowerCase() === auth.currentUser?.email?.toLowerCase()), 
+                [users, auth.currentUser]
+            );
+            const sellerId = currentUser?.sellerId || auth.currentUser?.email || 'N/A';
+            const currentRole = currentUser?.role || 'Staff';
+
+            // --- NEW: Seal Sales Data Restriction ---
+            const accessibleSales = useMemo(() => {
+                if (currentRole === 'Admin') return sales;
+                return sales.filter(s => s.sellerId === currentUser?.sellerId || s.sellerId === auth.currentUser?.email);
+            }, [sales, currentRole, currentUser, auth.currentUser]);
+
+            // --- Report Logic ---
+            const filteredReportSales = useMemo(() => {
+                if (!accessibleSales || accessibleSales.length === 0) return [];
+                
+                let startTime = 0;
+                let endTime = Infinity;
+
+                if (reportFilter === 'Custom') {
+                    if (customStartDate) startTime = new Date(customStartDate).getTime();
+                    if (customEndDate) {
+                        const end = new Date(customEndDate);
+                        end.setHours(23, 59, 59, 999);
+                        endTime = end.getTime();
+                    }
+                } else {
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+                    
+                    if (reportFilter === 'Today') {
+                        startTime = today.getTime();
+                    } else if (reportFilter === 'Yesterday') {
+                        const yesterday = new Date(today); 
+                        yesterday.setDate(yesterday.getDate() - 1);
+                        startTime = yesterday.getTime();
+                        endTime = today.getTime() - 1;
+                    } else if (reportFilter === 'This Week') {
+                        const start = new Date(today); 
+                        start.setDate(start.getDate() - start.getDay());
+                        startTime = start.getTime();
+                    } else if (reportFilter === 'Last Week') {
+                        const start = new Date(today); 
+                        start.setDate(start.getDate() - start.getDay() - 7);
+                        const end = new Date(start); 
+                        end.setDate(end.getDate() + 7);
+                        startTime = start.getTime();
+                        endTime = end.getTime() - 1;
+                    } else if (reportFilter === 'This Month') {
+                        startTime = new Date(today.getFullYear(), today.getMonth(), 1).getTime();
+                    } else if (reportFilter === 'Last Month') {
+                        startTime = new Date(today.getFullYear(), today.getMonth() - 1, 1).getTime();
+                        endTime = new Date(today.getFullYear(), today.getMonth(), 1).getTime() - 1;
+                    } else if (reportFilter === 'This Year') {
+                        startTime = new Date(today.getFullYear(), 0, 1).getTime();
+                    }
+                }
+
+                const customerSearchLower = reportCustomerSearch.toLowerCase();
+                let matchingCustomerIds = null;
+                if (customerSearchLower) {
+                    matchingCustomerIds = new Set(customers.filter(c => 
+                        (c.shopName || '').toLowerCase().includes(customerSearchLower) ||
+                        (c.ownerName || '').toLowerCase().includes(customerSearchLower) ||
+                        (c.contact || '').includes(customerSearchLower)
+                    ).map(c => c.id));
+                }
+
+                return accessibleSales.filter(s => {
+                    const t = s.createdAt ? (s.createdAt.seconds * 1000) : new Date(s.date).getTime();
+                    const timeMatch = t >= startTime && t <= endTime;
+                    const sellerMatch = reportSellerId === 'All' || s.sellerId === reportSellerId;
+                    const paymentMatch = reportPaymentMethod === 'All' || s.paymentMethod === reportPaymentMethod;
+                    
+                    let customerMatch = true;
+                    if (matchingCustomerIds) {
+                        customerMatch = matchingCustomerIds.has(s.customerId) || (s.customerName || '').toLowerCase().includes(customerSearchLower);
+                    }
+
+                    return timeMatch && sellerMatch && paymentMatch && customerMatch;
+                }).sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+
+            }, [accessibleSales, reportFilter, customStartDate, customEndDate, reportSellerId, reportPaymentMethod, reportCustomerSearch, customers]);
+
+            const reportTotal = filteredReportSales.reduce((acc, s) => acc + (parseFloat(s.total) || 0), 0);
+            
+            const uniqueSellers = useMemo(() => {
+                const sellers = new Set(accessibleSales.map(s => s.sellerId).filter(Boolean));
+                return Array.from(sellers);
+            }, [accessibleSales]);
+            // --------------------
+
+            const generateInvoiceNo = () => {
+                const now = new Date();
+                const d = String(now.getDate()).padStart(2, '0');
+                const m = String(now.getMonth() + 1).padStart(2, '0');
+                const y = String(now.getFullYear()).slice(-2);
+                const h = String(now.getHours()).padStart(2, '0');
+                const min = String(now.getMinutes()).padStart(2, '0');
+                const s = String(now.getSeconds()).padStart(2, '0');
+                return `HZN-${d}${m}${y}-${h}${min}${s}`;
+            };
+
+            const openNewSale = () => {
+                setFormError('');
+                setEditingSaleId(null);
+                setInvoiceNo(generateInvoiceNo());
+                setSaleDate(new Date().toLocaleString());
+                setSelectedCustomer(null);
+                setCart([]);
+                setDiscountValue(0);
+                setPaymentStatusToggle('Paid');
+                setAmountPaid('');
+                setSelectedDriverId('');
+                setPaymentMethod('Cash');
+                setDiscountType('Cash');
+                setIsSaleModalOpen(true);
+            };
+
+            const handleEditSale = (sale) => {
+                setFormError('');
+                setEditingSaleId(sale.id);
+                setInvoiceNo(sale.invoiceNo);
+                setSaleDate(sale.date);
+                const cust = customers.find(c => c.id === sale.customerId);
+                setSelectedCustomer(cust || { id: sale.customerId, shopName: sale.customerName });
+                setCart(sale.items || []);
+                setDiscountValue(sale.discount?.value || 0);
+                setDiscountType(sale.discount?.type || 'Cash');
+                
+                if (!sale.balanceDue || sale.balanceDue === 0) setPaymentStatusToggle('Paid');
+                else if (sale.amountPaid > 0) setPaymentStatusToggle('Partial');
+                else setPaymentStatusToggle('Unpaid');
+                
+                setAmountPaid(sale.amountPaid !== undefined ? sale.amountPaid : (sale.balanceDue > 0 ? 0 : sale.total));
+                setSelectedDriverId(sale.driverId || '');
+                setPaymentMethod(sale.paymentMethod || 'Cash');
+                setIsSaleModalOpen(true);
+            };
+
+            const handleDeleteSale = async (id) => {
+                if (confirmSaleDeleteId === id) {
+                    try {
+                        const { doc, deleteDoc, updateDoc } = window.firebaseSDK;
+                        
+                        // 1. Inventory Refund Strategy
+                        const saleToDelete = sales.find(s => s.id === id);
+                        if (saleToDelete && saleToDelete.items) {
+                            for (const item of saleToDelete.items) {
+                                const product = products.find(p => p.id === item.id);
+                                if (product) {
+                                    const currentQty = parseInt(product.qty) || 0;
+                                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', item.id), { qty: (currentQty + item.qty).toString() });
+                                }
+                            }
+                        }
+
+                        // 2. Delete Order
+                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orders', id));
+                        setConfirmSaleDeleteId(null);
+                        addToast("Sale record voided and inventory returned.", "info");
+                    } catch (e) {
+                        console.error("Delete Error:", e);
+                    }
+                } else {
+                    setConfirmSaleDeleteId(id);
+                    setTimeout(() => setConfirmSaleDeleteId(null), 3000);
+                }
+            };
+
+            const addToCart = (product) => {
+                const existing = cart.find(item => item.id === product.id);
+                if (existing) {
+                    setCart(cart.map(item => item.id === product.id ? { ...item, qty: item.qty + 1 } : item));
+                } else {
+                    setCart([...cart, { ...product, qty: 1 }]);
+                }
+                setProdSearch('');
+            };
+
+            const handleScan = (scannedSku) => {
+                setIsScanning(false);
+                const product = products.find(p => p.sku === scannedSku);
+                if (product) {
+                    addToCart(product);
+                    addToast(`Scanned: ${product.name}`, "success");
+                } else {
+                    addToast(`Unrecognized Barcode: ${scannedSku}`, "error");
+                }
+            };
+
+            const cartTotal = useMemo(() => {
+                const sub = cart.reduce((acc, item) => acc + (parseFloat(item.price || 0) * item.qty), 0);
+                let disc = parseFloat(discountValue || 0);
+                if (discountType === 'Percentage') disc = (sub * disc) / 100;
+                return Math.max(0, sub - disc);
+            }, [cart, discountValue, discountType]);
+
+            const handleSaveSale = async () => {
+                setFormError('');
+                if (!selectedCustomer) return setFormError("Missing Field: Please select a customer first.");
+                if (cart.length === 0) return setFormError("Cart Empty: Please add at least one product.");
+                
+                setLoading(true);
+                const { collection, addDoc, updateDoc, doc, serverTimestamp } = window.firebaseSDK;
+                try {
+                    // --- NEW: Geofence Validation Check ---
+                    let locationData = { status: 'Unknown', distance: null, lat: null, lng: null };
+                    
+                    if (selectedCustomer.lat && selectedCustomer.lng) {
+                        try {
+                            const pos = await new Promise((resolve, reject) => {
+                                navigator.geolocation.getCurrentPosition(resolve, reject, { 
+                                    timeout: 10000, 
+                                    enableHighAccuracy: true 
+                                });
+                            });
+                            
+                            const dist = getDistanceInMeters(
+                                pos.coords.latitude, pos.coords.longitude, 
+                                parseFloat(selectedCustomer.lat), parseFloat(selectedCustomer.lng)
+                            );
+                            
+                            locationData = {
+                                status: dist <= 100 ? 'Verified' : 'Off-Site',
+                                distance: Math.round(dist),
+                                lat: pos.coords.latitude,
+                                lng: pos.coords.longitude
+                            };
+                        } catch (err) {
+                            console.warn("Geofence check failed or GPS denied.", err);
+                            locationData.status = 'GPS Denied/Failed';
+                        }
+                    } else {
+                        locationData.status = 'Customer Missing GPS';
+                    }
+
+                    // --- 1. Calculate Inventory Net Changes ---
+                    const stockChanges = {}; 
+                    
+                    if (editingSaleId) {
+                        const oldSale = accessibleSales.find(s => s.id === editingSaleId);
+                        const oldCart = oldSale?.items || [];
+                        oldCart.forEach(item => {
+                            stockChanges[item.id] = (stockChanges[item.id] || 0) + item.qty;
+                        });
+                    }
+                    
+                    cart.forEach(item => {
+                        stockChanges[item.id] = (stockChanges[item.id] || 0) - item.qty;
+                    });
+
+                    // --- 1.5 Calculate Payments & Debt ---
+                    let finalAmountPaid = 0;
+                    if (paymentStatusToggle === 'Paid') {
+                        finalAmountPaid = cartTotal;
+                    } else if (paymentStatusToggle === 'Unpaid') {
+                        finalAmountPaid = 0;
+                    } else {
+                        finalAmountPaid = parseFloat(amountPaid) || 0;
+                    }
+                    const finalBalanceDue = Math.max(0, cartTotal - finalAmountPaid);
+                    const paymentStatus = finalBalanceDue > 0 ? (finalAmountPaid > 0 ? 'Partial' : 'Unpaid') : 'Paid';
+
+                    // --- 2. Save Order Data ---
+                    const payload = {
+                        invoiceNo,
+                        date: saleDate,
+                        customerId: selectedCustomer.id,
+                        customerName: selectedCustomer.shopName,
+                        sellerId, 
+                        driverId: selectedDriverId,
+                        items: cart,
+                        paymentMethod,
+                        discount: { type: discountType, value: parseFloat(discountValue) || 0 },
+                        amountPaid: finalAmountPaid,
+                        balanceDue: finalBalanceDue,
+                        paymentStatus: paymentStatus,
+                        total: cartTotal,
+                        locationData: locationData, // Inject Geofence Data here
+                        updatedAt: serverTimestamp()
+                    };
+
+                    if (editingSaleId) {
+                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orders', editingSaleId), payload);
+                    } else {
+                        payload.createdAt = serverTimestamp();
+                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'orders'), payload);
+                    }
+
+                    // --- 3. Apply Inventory Updates ---
+                    for (const [productId, change] of Object.entries(stockChanges)) {
+                        if (change === 0) continue; 
+                        
+                        const product = products.find(p => p.id === productId);
+                        if (product) {
+                            const currentQty = parseInt(product.qty) || 0;
+                            const newQty = Math.max(0, currentQty + change); 
+                            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', productId), { qty: newQty.toString() });
+                        }
+                    }
+
+                    setIsSaleModalOpen(false);
+                    addToast(editingSaleId ? "Sale record updated!" : "Sale completed successfully!", "success");
+                } catch (e) { 
+                    console.error("Sale Completion Error:", e);
+                    setFormError("Database Error: " + e.message); 
+                }
+                setLoading(false);
+            };
+
+            const filteredCustomers = customers.filter(c => {
+                const s = custSearch.toLowerCase();
+                const matchSearch = (c.shopName||'').toLowerCase().includes(s) || 
+                                    (c.ownerName||'').toLowerCase().includes(s) ||
+                                    (c.contact||'').includes(s);
+                const matchRole = currentRole === 'Admin' || c.sellerId === currentUser?.sellerId || c.sellerId === auth.currentUser?.email;
+                return matchSearch && matchRole;
+            });
+
+            const filteredProducts = products.filter(p => 
+                (p.name||'').toLowerCase().includes(prodSearch.toLowerCase()) || 
+                (p.sku||'').toLowerCase().includes(prodSearch.toLowerCase())
+            );
+
+            return (
+                <div className="space-y-6 pb-20 animate-in fade-in duration-300 px-1">
+                    <div className="flex bg-slate-100 dark:bg-slate-800/60 p-1 rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-inner max-w-md mx-auto">
+                        <button onClick={() => setSaleTab('recent')} className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${saleTab === 'recent' ? 'bg-brand-600 text-white shadow-lg' : 'text-slate-400'}`}>
+                            <i className="fas fa-clock"></i> Recent Sales
+                        </button>
+                        <button onClick={() => setSaleTab('report')} className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${saleTab === 'report' ? 'bg-brand-600 text-white shadow-lg' : 'text-slate-400'}`}>
+                            <i className="fas fa-chart-pie"></i> Sales Report
+                        </button>
+                    </div>
+
+                    {saleTab === 'recent' ? (
+                        <>
+                            <div className="flex justify-between items-center px-1">
+                                <h2 className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Recent Sales</h2>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-1">
+                                {accessibleSales.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).map(s => {
+                                    const driver = drivers.find(d => d.id === s.driverId);
+                                    const customer = customers.find(c => c.id === s.customerId);
+                                    return (
+                                        <div key={s.id} className="bg-white dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-200 dark:border-slate-700/50 flex flex-col gap-3 shadow-sm transition-all hover:shadow-lg">
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <div className="flex items-center gap-2 max-w-[70%]">
+                                                        <p className="text-xs font-mono font-bold text-brand-500 truncate">{s.invoiceNo}</p>
+                                                        {s.locationData?.status === 'Off-Site' && (
+                                                            <span className="flex-shrink-0 flex items-center gap-1 bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400 text-[8px] font-black px-1.5 py-0.5 rounded animate-pulse" title={`Transaction occurred ${s.locationData.distance}m away from registered shop location.`}>
+                                                                <i className="fas fa-exclamation-triangle"></i> {s.locationData.distance}m OFF-SITE
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase border ${
+                                                        s.balanceDue > 0 ? (s.amountPaid > 0 ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20') : 
+                                                        'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                                                    }`}>
+                                                        {s.balanceDue > 0 ? (s.amountPaid > 0 ? `CREDIT: $${s.balanceDue.toFixed(2)}` : 'UNPAID') : `PAID (${s.paymentMethod || 'Cash'})`}
+                                                    </span>
+                                                </div>
+                                                
+                                                <div className="flex items-start justify-between gap-2 bg-slate-50 dark:bg-slate-900/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/50">
+                                                    <div className="min-w-0 flex-1">
+                                                        <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight line-clamp-1 mb-1">{s.customerName}</h3>
+                                                        {customer && (
+                                                            <div className="space-y-0.5 mb-1.5">
+                                                                <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate"><i className="fas fa-user-circle w-3 opacity-70"></i>{customer.ownerName || '---'}</p>
+                                                                <p className="text-[10px] font-bold text-brand-600 dark:text-brand-400 truncate"><i className="fas fa-phone w-3 opacity-70"></i>{customer.contact || '---'}</p>
+                                                            </div>
+                                                        )}
+                                                        <p className="text-[9px] text-slate-400 font-medium truncate"><i className="far fa-calendar-alt w-3 opacity-50"></i>{s.date.split(',')[0]}</p>
+                                                    </div>
+                                                    {customer && (customer.googleMapsLink || (customer.lat && customer.lng)) && (
+                                                        <a 
+                                                            href={customer.googleMapsLink || `https://www.google.com/maps?q=${customer.lat},${customer.lng}`} 
+                                                            target="_blank" 
+                                                            rel="noopener noreferrer" 
+                                                            className="w-8 h-8 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center text-brand-500 hover:bg-brand-50 hover:text-brand-600 transition-colors flex-shrink-0 shadow-sm border border-slate-200 dark:border-slate-700"
+                                                            title="View on Google Maps"
+                                                        >
+                                                            <i className="fas fa-map-marker-alt text-[10px]"></i>
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-slate-50 dark:bg-slate-900/40 rounded-xl p-3 space-y-2 mt-auto">
+                                                <div className="flex justify-between items-end">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Total</span>
+                                                    <p className="text-sm font-black text-brand-600 dark:text-brand-400">${parseFloat(s.total || 0).toFixed(2)}</p>
+                                                </div>
+                                                <div className={`grid grid-cols-4 gap-1 border-t border-slate-200/50 dark:border-slate-700/50 pt-2`}>
+                                                    <div className="flex flex-col items-center min-w-0" title="Seller ID">
+                                                        <i className="fas fa-id-badge text-[10px] text-slate-400 mb-0.5"></i>
+                                                        <span className="text-[9px] font-bold text-slate-500 truncate w-full text-center" title={`SID: ${s.sellerId}`}>SID:{s.sellerId || '-'}</span>
+                                                    </div>
+                                                    <div className="flex flex-col items-center border-x border-slate-200/50 dark:border-slate-700/50 px-1 min-w-0" title="Driver">
+                                                        <i className="fas fa-truck text-[10px] text-slate-400 mb-0.5"></i>
+                                                        <span className="text-[9px] font-bold text-slate-500 truncate w-full text-center">{driver?.name || 'Self'}</span>
+                                                    </div>
+                                                    <div className="flex flex-col items-center min-w-0" title="Discount">
+                                                        <i className="fas fa-tag text-[10px] text-slate-400 mb-0.5"></i>
+                                                        <span className="text-[9px] font-bold text-slate-500">{s.discount?.type === 'Percentage' ? '%' : '$'}</span>
+                                                    </div>
+                                                    {s.balanceDue > 0 ? (
+                                                        s.amountPaid > 0 ? (
+                                                            <div className="flex flex-col items-center border-l border-slate-200/50 dark:border-slate-700/50 px-1 min-w-0" title="Credit Balance">
+                                                                <i className="fas fa-adjust text-[10px] text-amber-500 mb-0.5"></i>
+                                                                <span className="text-[9px] font-bold text-amber-500 truncate w-full text-center">OWES: ${s.balanceDue.toFixed(2)}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex flex-col items-center border-l border-slate-200/50 dark:border-slate-700/50 px-1 min-w-0" title="Unpaid">
+                                                                <i className="fas fa-times-circle text-[10px] text-red-500 mb-0.5"></i>
+                                                                <span className="text-[9px] font-bold text-red-500 truncate w-full text-center">UNPAID</span>
+                                                            </div>
+                                                        )
+                                                    ) : (
+                                                        <div className="flex flex-col items-center border-l border-slate-200/50 dark:border-slate-700/50 px-1 min-w-0" title="Payment Status">
+                                                            <i className="fas fa-check-circle text-[10px] text-emerald-500 mb-0.5"></i>
+                                                            <span className="text-[9px] font-bold text-emerald-500 truncate w-full text-center">PAID FULL</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex gap-2 mt-auto pt-1">
+                                                <button onClick={() => handleEditSale(s)} className="flex-1 bg-slate-50 dark:bg-slate-700/60 py-2.5 rounded-xl text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:bg-brand-500 hover:text-white transition-all">
+                                                    Edit Record
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleDeleteSale(s.id)} 
+                                                    className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${confirmSaleDeleteId === s.id ? 'bg-red-500 text-white flex-1' : 'bg-red-500/10 text-red-500 hover:bg-red-500/20'}`}
+                                                >
+                                                    <i className={`fas ${confirmSaleDeleteId === s.id ? 'fa-check' : 'fa-trash-alt'} text-[10px]`}></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </>
+                    ) : (
+                        <div className="space-y-6 animate-in fade-in duration-300 max-w-5xl mx-auto">
+                            {/* Filter Section */}
+                            <div className="bg-white dark:bg-slate-800/60 p-5 rounded-3xl border border-slate-200 dark:border-slate-700/50 shadow-sm space-y-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-2">Time Period</label>
+                                        <select className="select font-bold" value={reportFilter} onChange={e=>setReportFilter(e.target.value)}>
+                                            <option value="Today">Today</option>
+                                            <option value="Yesterday">Yesterday</option>
+                                            <option value="This Week">This Week</option>
+                                            <option value="Last Week">Last Week</option>
+                                            <option value="This Month">This Month</option>
+                                            <option value="Last Month">Last Month</option>
+                                            <option value="This Year">This Year</option>
+                                            <option value="Custom">Custom Date Range...</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-2">Customer</label>
+                                        <div className="relative">
+                                            <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                            <input 
+                                                className="input !pl-10 font-bold" 
+                                                placeholder="Shop, Owner, Phone..." 
+                                                value={reportCustomerSearch} 
+                                                onChange={e=>setReportCustomerSearch(e.target.value)} 
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-2">Seller ID</label>
+                                        <select className="select font-bold" value={reportSellerId} onChange={e=>setReportSellerId(e.target.value)}>
+                                            <option value="All">All Sellers</option>
+                                            {uniqueSellers.map(sid => <option key={sid} value={sid}>{sid}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-2">Payment Method</label>
+                                        <select className="select font-bold" value={reportPaymentMethod} onChange={e=>setReportPaymentMethod(e.target.value)}>
+                                            <option value="All">All Methods</option>
+                                            <option value="Cash">Cash</option>
+                                            <option value="Bank">Bank</option>
+                                        </select>
+                                    </div>
                                 </div>
-                                <div className="flex gap-2 w-full sm:w-auto">
-                                    <Button className="!py-3 px-6 shadow-sm flex-1 sm:flex-none" onClick={handleSaveCategory} disabled={catLoading}>
-                                        {catLoading ? <i className="fas fa-circle-notch fa-spin"></i> : (editingCatId ? 'UPDATE' : 'ADD')}
-                                    </Button>
-                                    {editingCatId && (
-                                        <button onClick={() => { setEditingCatId(null); setCatFormData({name:''}); }} className="px-4 py-3 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs hover:bg-slate-300 transition-colors flex-1 sm:flex-none">
-                                            CANCEL
-                                        </button>
+                                {reportFilter === 'Custom' && (
+                                    <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-slate-200 dark:border-slate-700/50 animate-in slide-in-from-top-2">
+                                        <div className="flex-1 space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-2">Start Date</label>
+                                            <input type="date" className="input" value={customStartDate} onChange={e=>setCustomStartDate(e.target.value)} />
+                                        </div>
+                                        <div className="flex-1 space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-2">End Date</label>
+                                            <input type="date" className="input" value={customEndDate} onChange={e=>setCustomEndDate(e.target.value)} />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Metrics Section */}
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                <div className="bg-gradient-to-br from-brand-500 to-brand-700 rounded-3xl p-6 text-white shadow-lg shadow-brand-500/30 relative overflow-hidden group col-span-2 md:col-span-1">
+                                    <i className="fas fa-coins absolute -right-4 -bottom-4 text-7xl opacity-10 group-hover:scale-110 transition-transform"></i>
+                                    <p className="text-[10px] font-bold uppercase tracking-widest opacity-80 mb-2">Total Revenue</p>
+                                    <p className="text-4xl font-black tracking-tighter">${reportTotal.toFixed(2)}</p>
+                                </div>
+                                <div className="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 rounded-3xl p-6 shadow-sm relative overflow-hidden group">
+                                    <i className="fas fa-file-invoice absolute -right-4 -bottom-4 text-7xl text-slate-200 dark:text-slate-700 opacity-50 group-hover:scale-110 transition-transform"></i>
+                                    <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2 relative z-10">Total Invoices</p>
+                                    <p className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter relative z-10">{filteredReportSales.length}</p>
+                                </div>
+                                <div className="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 rounded-3xl p-6 shadow-sm relative overflow-hidden group">
+                                    <i className="fas fa-chart-pie absolute -right-4 -bottom-4 text-7xl text-slate-200 dark:text-slate-700 opacity-50 group-hover:scale-110 transition-transform"></i>
+                                    <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2 relative z-10">Avg Order Value</p>
+                                    <p className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter relative z-10">${filteredReportSales.length > 0 ? (reportTotal / filteredReportSales.length).toFixed(2) : '0.00'}</p>
+                                </div>
+                            </div>
+
+                            {/* Transaction List */}
+                            <div className="bg-white dark:bg-slate-800/40 rounded-3xl border border-slate-200 dark:border-slate-700/50 shadow-sm overflow-hidden flex flex-col">
+                                <div className="p-5 border-b border-slate-100 dark:border-slate-700/50">
+                                    <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-widest">Transaction History</h3>
+                                </div>
+                                <div className="divide-y divide-slate-100 dark:divide-slate-700/50 max-h-96 overflow-y-auto custom-scroll">
+                                    {filteredReportSales.length === 0 ? (
+                                        <div className="py-16 text-center text-slate-400">
+                                            <i className="fas fa-receipt text-5xl mb-4 opacity-20"></i>
+                                            <p className="text-xs font-bold uppercase tracking-widest">No Sales Found</p>
+                                            <p className="text-[10px] mt-2 opacity-70">Adjust your filters to see more data.</p>
+                                        </div>
+                                    ) : (
+                                        filteredReportSales.map(s => (
+                                            <div key={s.id} className="p-4 lg:p-5 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-3 mb-1">
+                                                        <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{s.customerName}</p>
+                                                        <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase border ${
+                                                            s.balanceDue > 0 ? (s.amountPaid > 0 ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20') : 
+                                                            'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                                                        }`}>
+                                                            {s.balanceDue > 0 ? (s.amountPaid > 0 ? `CREDIT: $${s.balanceDue.toFixed(2)}` : 'UNPAID') : `PAID (${s.paymentMethod || 'Cash'})`}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex flex-wrap items-center gap-2 lg:gap-4 text-xs">
+                                                        <p className="text-brand-500 font-mono font-bold truncate"><i className="fas fa-hashtag mr-1 opacity-50"></i>{s.invoiceNo}</p>
+                                                        <p className="text-slate-400 font-medium truncate"><i className="far fa-calendar-alt mr-1 opacity-50"></i>{s.date.split(',')[0]}</p>
+                                                        <p className="text-slate-400 font-medium truncate"><i className="fas fa-id-badge mr-1 opacity-50"></i>SID:{s.sellerId}</p>
+                                                        {s.locationData?.status === 'Off-Site' && (
+                                                            <p className="text-red-500 font-bold truncate bg-red-50 dark:bg-red-500/10 px-1.5 py-0.5 rounded text-[10px]">
+                                                                <i className="fas fa-exclamation-triangle mr-1"></i>{s.locationData.distance}m OFF-SITE
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="text-right flex-shrink-0 ml-4">
+                                                    <p className="text-lg lg:text-xl font-black text-brand-600 dark:text-brand-400">${parseFloat(s.total || 0).toFixed(2)}</p>
+                                                    <button onClick={() => handleEditSale(s)} className="text-[10px] font-bold text-slate-400 hover:text-brand-500 uppercase tracking-widest mt-1 transition-colors group">
+                                                        View Details <i className="fas fa-arrow-right ml-1 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))
                                     )}
                                 </div>
                             </div>
-                            
-                            {/* Table/List */}
-                            <div className="bg-white dark:bg-slate-800/40 rounded-3xl border border-slate-200 dark:border-slate-700/50 overflow-hidden shadow-sm">
-                                <table className="w-full text-left text-sm">
-                                    <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 text-[10px] uppercase tracking-widest font-bold">
-                                        <tr>
-                                            <th className="p-4">Custom Category Name</th>
-                                            <th className="p-4 text-right">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                                        {rawCategories.map(c => (
-                                            <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-slate-700 dark:text-slate-300">
-                                                <td className="p-4 font-bold">{c.name}</td>
-                                                <td className="p-4 flex justify-end gap-2">
-                                                    <button onClick={() => { setEditingCatId(c.id); setCatFormData({name: c.name}); }} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-brand-500 flex items-center justify-center transition-colors">
-                                                        <i className="fas fa-pen text-[10px]"></i>
-                                                    </button>
-                                                    <button onClick={() => handleDeleteCategory(c.id)} className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${confirmCatDeleteId === c.id ? 'bg-red-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-red-500'}`}>
-                                                        <i className={`fas ${confirmCatDeleteId === c.id ? 'fa-check' : 'fa-trash'} text-[10px]`}></i>
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {rawCategories.length === 0 && (
-                                            <tr>
-                                                <td colSpan="2" className="p-8 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">
-                                                    No custom categories added.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
+                        </div>
+                    )}
+
+                    <button className="fab shadow-glow" onClick={openNewSale}>
+                        <i className="fas fa-plus"></i>
+                    </button>
+
+                    <FullScreenModal isOpen={isSaleModalOpen} onClose={() => setIsSaleModalOpen(false)} title={editingSaleId ? "Edit Sale Record" : "Create New Sale"}>
+                        <div className="space-y-6 max-w-4xl mx-auto">
+                            {formError && (
+                                <div className="bg-red-500/10 border border-red-500/30 text-red-500 p-4 rounded-2xl flex items-start gap-3 animate-in shake duration-300">
+                                    <i className="fas fa-exclamation-triangle mt-0.5"></i>
+                                    <p className="text-xs font-bold">{formError}</p>
+                                </div>
+                            )}
+
+                            <div className="bg-slate-100 dark:bg-slate-800/60 p-4 rounded-2xl flex justify-between items-center border border-slate-200 dark:border-slate-700/50">
+                                <div className="min-w-0">
+                                    <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Invoice No</p>
+                                    <p className="text-sm lg:text-base font-mono font-black text-brand-500 truncate">{invoiceNo}</p>
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                    <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Date & Time</p>
+                                    <p className="text-xs lg:text-sm text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">{saleDate.split(',')[0]}</p>
+                                </div>
                             </div>
-                            <p className="text-[10px] font-bold text-slate-400 text-center uppercase tracking-widest px-4 leading-relaxed">
-                                Manage your product categories here. Any category you add will be immediately available when adding or editing products.
-                            </p>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+                                {/* Left Column: Selections */}
+                                <div className="space-y-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-2">1. Select Customer</label>
+                                        {selectedCustomer ? (
+                                            <div className="bg-brand-50 dark:bg-brand-500/10 p-4 rounded-2xl border border-brand-200 dark:border-brand-500/20 flex justify-between items-center">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <Avatar name={selectedCustomer.shopName} url={selectedCustomer.photo} size="12" isCircle={true} />
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{selectedCustomer.shopName}</p>
+                                                        <p className="text-xs text-brand-600 truncate">{selectedCustomer.ownerName} • {selectedCustomer.contact}</p>
+                                                    </div>
+                                                </div>
+                                                <button onClick={() => setSelectedCustomer(null)} className="text-slate-400 hover:text-red-500 ml-2 text-lg"><i className="fas fa-times-circle"></i></button>
+                                            </div>
+                                        ) : (
+                                            <div className="relative">
+                                                <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                                <input className="input !pl-12" placeholder="Search Customer..." value={custSearch} onChange={e=>setCustSearch(e.target.value)} />
+                                                {custSearch && (
+                                                    <div className="absolute top-full left-0 w-full mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-50 max-h-64 overflow-y-auto custom-scroll">
+                                                        {filteredCustomers.map(c => (
+                                                            <div key={c.id} onClick={() => { setSelectedCustomer(c); setCustSearch(''); }} className="p-4 border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer flex items-center gap-3 transition-colors">
+                                                                <Avatar name={c.shopName} url={c.photo} size="10" isCircle={true} />
+                                                                <div className="min-w-0">
+                                                                    <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{c.shopName}</p>
+                                                                    <p className="text-xs text-slate-400 truncate">{c.ownerName || 'No Owner'} • {c.contact}</p>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-2">2. Add Products</label>
+                                        <div className="flex gap-2">
+                                            <div className="relative flex-1 min-w-0">
+                                                <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                                <input className="input !pl-12" placeholder="Search Product..." value={prodSearch} onChange={e=>setProdSearch(e.target.value)} />
+                                                {prodSearch && (
+                                                    <div className="absolute top-full left-0 w-full mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-50 max-h-64 overflow-y-auto custom-scroll">
+                                                        {filteredProducts.map(p => (
+                                                            <div key={p.id} onClick={() => addToCart(p)} className="p-4 border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer flex items-center gap-3 transition-colors">
+                                                                <Avatar name={p.name} url={p.photo} size="10" />
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{p.name}</p>
+                                                                    <p className="text-xs text-brand-500 font-mono truncate">#{p.sku}</p>
+                                                                </div>
+                                                                <p className="text-sm font-black text-slate-900 dark:text-white">${p.price}</p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <button onClick={() => setIsScanning(true)} className="w-12 h-[52px] rounded-2xl bg-slate-900 dark:bg-brand-600 text-white flex flex-shrink-0 items-center justify-center shadow-lg active:scale-95 transition-transform" title="Scan Barcode">
+                                                <i className="fas fa-barcode text-xl"></i>
+                                            </button>
+                                        </div>
+
+                                        <div className="space-y-2 mt-4 max-h-[40vh] overflow-y-auto pr-1 custom-scroll">
+                                            {cart.length === 0 && <div className="text-center py-10 border-2 border-dashed border-slate-200 dark:border-slate-700/50 rounded-3xl text-slate-400"><i className="fas fa-shopping-basket text-4xl mb-3 opacity-50"></i><p className="text-xs font-bold uppercase tracking-widest">Cart is empty</p></div>}
+                                            {cart.map(item => (
+                                                <div key={item.id} className="flex flex-col bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-700/50 gap-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <Avatar name={item.name} url={item.photo} size="12" />
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{item.name}</p>
+                                                            <p className="text-xs text-slate-500 font-mono truncate">#{item.sku}</p>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 flex-shrink-0 shadow-sm">
+                                                            <button onClick={() => {
+                                                                const newCart = item.qty > 1 ? cart.map(i => i.id === item.id ? {...i, qty: i.qty - 1} : i) : cart.filter(i => i.id !== item.id);
+                                                                setCart(newCart);
+                                                            }} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg hover:text-red-500 transition-colors"><i className="fas fa-minus text-xs"></i></button>
+                                                            <span className="text-sm font-bold text-slate-900 dark:text-white w-6 text-center">{item.qty}</span>
+                                                            <button onClick={() => addToCart(item)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg hover:text-brand-500 transition-colors"><i className="fas fa-plus text-xs"></i></button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex justify-between items-center px-1 pt-2 border-t border-slate-200/50 dark:border-slate-700/30">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Unit Price</span>
+                                                            <span className="text-sm font-bold text-slate-600 dark:text-slate-300">${parseFloat(item.price || 0).toFixed(2)}</span>
+                                                        </div>
+                                                        <div className="flex flex-col text-right">
+                                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Line Total</span>
+                                                            <span className="text-sm font-black text-brand-600 dark:text-brand-400">${(parseFloat(item.price || 0) * item.qty).toFixed(2)}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Right Column: Details & Checkout */}
+                                <div className="space-y-6 lg:border-l lg:border-slate-200 lg:dark:border-slate-800/50 lg:pl-8 flex flex-col h-full">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1 min-w-0">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-2">Seller ID</label>
+                                            <div className="input !bg-slate-100 dark:!bg-slate-800/50 !border-dashed font-mono font-bold text-brand-600 dark:text-brand-400 truncate">
+                                                {sellerId}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1 min-w-0">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-2">Assigned Driver</label>
+                                            <select className="select" value={selectedDriverId} onChange={e=>setSelectedDriverId(e.target.value)}>
+                                                <option value="">No Driver / Self</option>
+                                                {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-slate-50 dark:bg-slate-800/40 p-4 lg:p-5 rounded-3xl space-y-4 lg:space-y-5 border border-slate-200 dark:border-slate-700/50 shadow-inner">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Payment Method</label>
+                                            <div className="flex bg-slate-200/50 dark:bg-slate-900 p-1 rounded-xl w-full">
+                                                <button onClick={() => setPaymentMethod('Cash')} className={`flex-1 py-2 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${paymentMethod === 'Cash' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}>CASH</button>
+                                                <button onClick={() => setPaymentMethod('Bank')} className={`flex-1 py-2 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${paymentMethod === 'Bank' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}>BANK</button>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Apply Discount</label>
+                                            <div className="flex bg-slate-200/50 dark:bg-slate-900 p-1 rounded-xl w-full mb-2">
+                                                <button onClick={() => setDiscountType('Cash')} className={`flex-1 py-2 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${discountType === 'Cash' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}>$ USD</button>
+                                                <button onClick={() => setDiscountType('Percentage')} className={`flex-1 py-2 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${discountType === 'Percentage' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}>% PCT</button>
+                                            </div>
+                                            <input type="number" className="input text-lg font-bold" placeholder="Discount Value..." value={discountValue} onChange={e=>setDiscountValue(e.target.value)} />
+                                        </div>
+                                        
+                                        <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-700/50">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Payment Status</label>
+                                            <div className="flex bg-slate-200/50 dark:bg-slate-900 p-1 rounded-xl w-full">
+                                                <button onClick={() => { setPaymentStatusToggle('Paid'); setAmountPaid(''); }} className={`flex-1 py-2 rounded-lg text-[10px] sm:text-xs font-bold transition-all truncate ${paymentStatusToggle === 'Paid' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}>PAID FULL</button>
+                                                <button onClick={() => { setPaymentStatusToggle('Partial'); setAmountPaid(''); }} className={`flex-1 py-2 rounded-lg text-[10px] sm:text-xs font-bold transition-all truncate ${paymentStatusToggle === 'Partial' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}>PARTIAL</button>
+                                                <button onClick={() => { setPaymentStatusToggle('Unpaid'); setAmountPaid(0); }} className={`flex-1 py-2 rounded-lg text-[10px] sm:text-xs font-bold transition-all truncate ${paymentStatusToggle === 'Unpaid' ? 'bg-red-500 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}>UNPAID</button>
+                                            </div>
+                                        </div>
+                                        
+                                        {paymentStatusToggle === 'Partial' && (
+                                            <div className="flex flex-col sm:flex-row items-end gap-3 pt-2 animate-in slide-in-from-top-2">
+                                                <div className="w-full sm:flex-1">
+                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-2 mb-1 block">Amount Paid ($)</label>
+                                                    <input type="number" className="input text-lg font-bold !border-amber-200 dark:!border-amber-500/30 focus:!border-amber-500 focus:!shadow-[0_0_0_4px_rgba(245,158,11,0.1)]" placeholder="0.00" value={amountPaid} onChange={e=>setAmountPaid(e.target.value)} />
+                                                </div>
+                                                <div className="w-full sm:flex-1 bg-amber-50 dark:bg-amber-500/10 p-3 rounded-2xl border border-amber-200 dark:border-amber-500/30 text-right h-auto sm:h-[60px] flex flex-col justify-center">
+                                                    <p className="text-[9px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest">Balance Due</p>
+                                                    <p className="text-xl font-black text-amber-600 dark:text-amber-400">${Math.max(0, cartTotal - (parseFloat(amountPaid) || 0)).toFixed(2)}</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                        
+                                        {paymentStatusToggle === 'Unpaid' && (
+                                            <div className="flex items-end gap-3 pt-2 animate-in slide-in-from-top-2">
+                                                <div className="w-full bg-red-50 dark:bg-red-500/10 p-3 rounded-2xl border border-red-200 dark:border-red-500/30 text-right h-auto sm:h-[60px] flex flex-col justify-center">
+                                                    <p className="text-[9px] font-bold text-red-600 dark:text-red-400 uppercase tracking-widest">Balance Due</p>
+                                                    <p className="text-xl font-black text-red-600 dark:text-red-400">${cartTotal.toFixed(2)}</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="pt-6 border-t border-slate-200 dark:border-slate-700/50 space-y-6 mt-auto">
+                                        <div className="flex justify-between items-end px-2 bg-brand-50 dark:bg-brand-900/20 p-6 rounded-3xl border border-brand-100 dark:border-brand-500/20">
+                                            <p className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Grand Total</p>
+                                            <p className="text-4xl lg:text-5xl font-black text-brand-600 dark:text-brand-400 tracking-tighter">${cartTotal.toFixed(2)}</p>
+                                        </div>
+                                        <Button className="w-full !py-5 shadow-glow text-base tracking-widest" onClick={handleSaveSale} disabled={loading}>
+                                            {loading ? <i className="fas fa-circle-notch fa-spin text-xl"></i> : <><i className="fas fa-check-double text-xl"></i> {editingSaleId ? 'UPDATE RECORD' : 'COMPLETE SALE'}</>}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </FullScreenModal>
 
