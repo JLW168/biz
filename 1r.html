@@ -1663,12 +1663,10 @@
                             </button>
                         )}
 
-                        {/* System Tab: Restricted to Admin only */}
-                        {currentProfileRole === 'Admin' && (
-                            <button onClick={() => { setSettingsTab('system'); if(isChatVisible) setIsChatVisible(false); }} className={`flex-1 min-w-[80px] py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${settingsTab === 'system' ? 'bg-brand-600 text-white shadow-lg' : 'text-slate-400'}`}>
-                                <i className="fas fa-server"></i> <span className="hidden sm:inline">System</span>
-                            </button>
-                        )}
+                        {/* System Tab: Available to ALL users for diagnostics */}
+                        <button onClick={() => { setSettingsTab('system'); if(isChatVisible) setIsChatVisible(false); }} className={`flex-1 min-w-[80px] py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${settingsTab === 'system' ? 'bg-brand-600 text-white shadow-lg' : 'text-slate-400'}`}>
+                            <i className="fas fa-server"></i> <span className="hidden sm:inline">System</span>
+                        </button>
 
                         {isChatVisible && (
                             <button onClick={() => { setSettingsTab('chat'); setActiveChatUser(null); }} className={`flex-1 min-w-[80px] py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 relative ${settingsTab === 'chat' ? 'bg-brand-600 text-white shadow-lg' : 'text-slate-400'}`}>
@@ -1806,7 +1804,7 @@
                         </div>
                     )}
 
-                    {settingsTab === 'system' && currentProfileRole === 'Admin' && (
+                    {settingsTab === 'system' && (
                         <div className="animate-in fade-in duration-200 space-y-4 min-w-0">
                             <div className="flex justify-between items-center px-1">
                                 <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">System & Diagnostics</h3>
@@ -1822,6 +1820,7 @@
                                         <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate">Clear Application Cache</h4>
                                         <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
                                             If the application is displaying outdated data, freezing, or experiencing synchronization issues, clearing the local browser cache and Service Workers will force a hard reset and fetch fresh data from the cloud.
+                                            <br/><span className="font-bold text-brand-500 mt-1.5 inline-block"><i className="fas fa-unlock-alt mr-1"></i>Available to all staff roles to resolve local device issues safely.</span>
                                         </p>
                                     </div>
                                 </div>
@@ -3968,7 +3967,7 @@
                         </button>
                         <button onClick={() => setActiveTab('settings')} className="bg-white dark:bg-slate-800/60 p-4 lg:p-6 rounded-2xl lg:rounded-3xl flex flex-col items-center justify-center gap-2 lg:gap-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-slate-100 dark:border-slate-700/50 transition-all active:scale-95 hover:border-orange-500/30 hover:shadow-xl group">
                             <div className="w-10 h-10 lg:w-16 lg:h-16 rounded-xl lg:rounded-2xl bg-orange-50 dark:bg-orange-500/10 text-orange-500 flex items-center justify-center text-xl lg:text-3xl group-hover:scale-110 transition-transform"><i className="fas fa-cog"></i></div>
-                            <span className="text-[9px] lg:text-xs font-black uppercase tracking-widest text-slate-700 dark:text-slate-200">Admin</span>
+                            <span className="text-[9px] lg:text-xs font-black uppercase tracking-widest text-slate-700 dark:text-slate-200">Settings</span>
                         </button>
                     </div>
 
@@ -4349,7 +4348,7 @@
                                 { id: 'customers', icon: 'fa-users', label: 'Clients & CRM' },
                                 { id: 'inventory', icon: 'fa-boxes', label: 'Inventory' },
                                 { id: 'purchase', icon: 'fa-shopping-cart', label: 'Sales Terminal' },
-                                { id: 'settings', icon: 'fa-cog', label: 'Admin Panel' }
+                                { id: 'settings', icon: 'fa-cog', label: 'Settings & System' }
                             ].map(item => (
                                 <button 
                                     key={item.id} 
@@ -4396,7 +4395,7 @@
                                     <div className="min-w-0">
                                         <h1 className="font-khmer-header text-sm sm:text-base text-slate-900 dark:text-white uppercase leading-tight truncate tracking-wider select-none">OUNNA</h1>
                                         <p className="text-[8px] font-bold text-brand-400 uppercase tracking-widest truncate">
-                                            {activeTab === 'dashboard' ? 'Launch Pad' : activeTab === 'customers' ? 'Tracking' : activeTab === 'inventory' ? 'Inventory' : activeTab === 'purchase' ? 'Terminal' : 'Admin'}
+                                            {activeTab === 'dashboard' ? 'Launch Pad' : activeTab === 'customers' ? 'Tracking' : activeTab === 'inventory' ? 'Inventory' : activeTab === 'purchase' ? 'Terminal' : 'Settings'}
                                         </p>
                                     </div>
                                 </div>
@@ -4436,7 +4435,7 @@
                         <header className="hidden lg:flex items-center justify-between px-8 py-5 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/50 sticky top-0 z-30 flex-none">
                             <div>
                                 <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                                    {activeTab === 'dashboard' ? 'Launch Pad' : activeTab === 'customers' ? 'Clients & Tracking' : activeTab === 'inventory' ? 'Inventory Management' : activeTab === 'purchase' ? 'Sales Terminal' : 'Admin Settings'}
+                                    {activeTab === 'dashboard' ? 'Launch Pad' : activeTab === 'customers' ? 'Clients & Tracking' : activeTab === 'inventory' ? 'Inventory Management' : activeTab === 'purchase' ? 'Sales Terminal' : 'System Settings'}
                                 </h2>
                                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">{greeting}, {profileName.split(' ')[0]}</p>
                             </div>
